@@ -3,11 +3,10 @@
 import os
 import gzip
 import pickle
-import logging
-import datetime
-
 import numpy as np
 import tensorflow as tf
+
+from tqdm import tqdm
 
 from utils.feeder.LSTMCRFeeder import LSTMCRFeeder
 from utils.feature_extractor import FeatureExtractor
@@ -33,11 +32,8 @@ def atisfull():
 
 
 def conll2003():
-    if not os.path.isfile('data/conll.pkl'):
-        parse_conll2003()
     with open('data/conll.pkl', 'rb') as fp:
         train_set, val_set, test_set, dicts = pickle.load(fp)
-
     return train_set, val_set, test_set, dicts
 
 
@@ -53,12 +49,18 @@ test_x, _, test_la = test_set
 
 
 def dump_data(prefix, x, la):
+    wlength = 50
     with open('data/%s.data' % prefix, 'w') as fp:
         for sw, sl in zip(x, la):
             for a, b in zip(sw, sl):
-                fp.write(idx2w[a] + '\t' + idx2la[b] + '\n')
+                fp.write(idx2w[a].ljust(wlength) + idx2la[b].ljust(wlength) + '\n')
             fp.write('\n')
 
+
+# print('Dump data...')
+
+# dump_data('train', train_x, train_la)
+# dump_data('test', test_x, test_la)
 
 print('Load data...')
 
@@ -75,12 +77,11 @@ else:
 
 '''
 [train_size, max_length, feat_size]
-feat_size: All Ngram features
+feat_size: All unigram features
 '''
 train_feats = fe.extract_features('data/train.txt')
 val_feats = fe.extract_features('data/valid.txt')
 test_feats = fe.extract_features('data/test.txt')
-
 
 print('Load model...')
 
@@ -93,103 +94,45 @@ vocab_size = len(w2idx)
 
 model = BiLSTMCRFModel(False, fe.feat_size, vocab_size, 128, 256, num_classes, max_length, 0.001, 0.5)
 
-print('Start training...')
-print('Train size = %d' % len(train_x))
-print('Val size = %d' % len(val_x))
-print('Test size = %d' % len(test_x))
-print('Num classes = %d' % num_classes)
-
-start_epoch = 1
-max_epoch = 20
+print('Start testing...')
 
 saver = tf.train.Saver()
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
+
 sess = tf.Session(config=config)
+saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir='checkpoints'))
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(message)s',
-                    datefmt='%m-%d %H:%M',
-                    handlers=[logging.FileHandler('logs/train.log'), logging.StreamHandler()])
 
-latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir='checkpoints')
-if latest_checkpoint:
-    saver.restore(sess, latest_checkpoint)
-else:
-    sess.run(tf.global_variables_initializer())
-
-train_feeder = LSTMCRFeeder(train_x, train_feats, train_la, max_length, model.feat_size, 16)
 val_feeder = LSTMCRFeeder(val_x, val_feats, val_la, max_length, model.feat_size, 16)
 test_feeder = LSTMCRFeeder(test_x, test_feats, test_la, max_length, model.feat_size, 16)
 
-# emb = np.load('data/emb.npy')
-# model.init_embedding(sess, emb)
-
-for epoch in range(start_epoch, max_epoch + 1):
-    loss = 0
-    for step in range(train_feeder.step_per_epoch):
-        tokens, feats, labels = train_feeder.feed()
-
-        step_loss = model.train_step(sess, tokens, feats, labels)
-        loss += step_loss
-
-        logging.info('epoch: %d, size: %d/%d, step_loss: %f, epoch_loss: %f' %
-              (epoch, train_feeder.offset, train_feeder.size, step_loss, loss)
-        )
-
-    preds = []
-    for step in range(val_feeder.step_per_epoch):
-        tokens, feats, labels = val_feeder.feed()
-        pred = model.test(sess, tokens, feats)
-        preds.extend(pred)
-    true_seqs = [idx2la[la] for sl in val_la for la in sl ]
-    pred_seqs = [idx2la[la] for sl in preds for la in sl ]
-    ll = min(len(true_seqs), len(pred_seqs))
-    _, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
-
-    val_feeder.next_epoch(False)
-
-    logging.info("Epoch: %d, val_f1: %f" % (epoch, f1))
-
-    preds = []
-    for step in range(test_feeder.step_per_epoch):
-        tokens, feats, labels = test_feeder.feed()
-        pred = model.test(sess, tokens, feats)
-        preds.extend(pred)
-    true_seqs = [idx2la[la] for sl in test_la for la in sl]
-    pred_seqs = [idx2la[la] for sl in preds for la in sl]
-    ll = min(len(true_seqs), len(pred_seqs))
-    _, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
-
-    test_feeder.next_epoch(False)
-
-    logging.info("Epoch: %d, test_f1: %f" % (epoch, f1))
-
-    '''
-    tokens, feats = feeder.val(val_x, val_feats)
+preds = []
+for step in tqdm(range(val_feeder.step_per_epoch)):
+    tokens, feats, labels = val_feeder.feed()
     pred = model.test(sess, tokens, feats)
-    f1 = conll_format(val_x, val_la, pred, idx2w, idx2la, 'valid')
-    '''
+    preds.extend(pred)
+true_seqs = [idx2la[la] for sl in test_la for la in sl]
+pred_seqs = [idx2la[la] for sl in preds for la in sl]
+ll = min(len(true_seqs), len(pred_seqs))
+_, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
 
-    '''
-    tokens, feats, length = feeder.predict(test_x[0], test_feats[0])
-    labels = test_la[0]
-    pred, scores = model.decode(sess, tokens, feats, length, 10)
-    print('{:<20} {}'.format('golden', labels.tolist()))
-    # print(pred)
-    '''
+print('Val F1 = %f' % f1)
 
-    saver.save(sess, 'checkpoints/model.ckpt', global_step=epoch)
+preds = []
+for step in tqdm(range(test_feeder.step_per_epoch)):
+    tokens, feats, labels = test_feeder.feed()
+    pred = model.test(sess, tokens, feats)
+    preds.extend(pred)
+true_seqs = [idx2la[la] for sl in test_la for la in sl]
+pred_seqs = [idx2la[la] for sl in preds for la in sl]
+ll = min(len(true_seqs), len(pred_seqs))
+_, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
 
-    logging.info('')
-    train_feeder.next_epoch()
+print('Test F1 = %f' % f1)
 
 '''
-print('Predict...')
-tokens, feats = feeder.test(test_x, test_feats)
-pred = model.test(sess, tokens, feats)
-
 print('Dump conll format...')
 conll_format(test_x, test_la, pred, idx2w, idx2la, 'test')
 
@@ -198,7 +141,6 @@ error_idx = np.where(compare == False)[0]
 '''
 
 
-'''
 def eval(idx):
     tokens, feats, length = feeder.predict(test_x[idx], test_feats[idx])
     model.decode(sess, tokens, feats, length)
@@ -218,11 +160,9 @@ def count_in(topK):
             total_in += 1
 
     print('{}/{} {}'.format(total_in, total, total_in / total))
-'''
 
 
-'''
-def dump_topK(topK):
+def dump_train_topK(topK):
     total = len(train_la)
 
     with open('dev/train.format', 'w') as fp:
@@ -243,10 +183,9 @@ def dump_topK(topK):
                 fp.write('\t'.join(out))
                 fp.write('\n')
             fp.write('\n')
-'''
 
-'''
-def dump_topK(topK):
+
+def dump_test_topK(topK):
     total = len(test_la)
 
     with open('dev/test.format', 'w') as fp:
@@ -267,4 +206,6 @@ def dump_topK(topK):
                 fp.write('\t'.join(out))
                 fp.write('\n')
             fp.write('\n')
-'''
+
+
+# dump_test_topK(1)

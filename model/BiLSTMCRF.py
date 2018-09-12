@@ -10,15 +10,27 @@ class BiLSTMCRFModel(object):
     """Bi-LSTM + CRF implemented by Tensorflow
 
     Attributes:
+        pre_embedding: use pre embedding
         feat_size: feature size
+        vocab_size: vocabulary size
+        embed_size: word embedding size
+        hidden_size: rnn hidden size
         num_classes: number of classes
         max_length: max length of sentence
-        weight_decay: weight of l2 loss
         learning_rate: learning rate
+        dropout: keep probability for dropout layer
     """
 
-    def __init__(self, pre_embedding: bool, feat_size: int, vocab_size: int, embed_size: int, hidden_size: int,
-                 num_classes: int, max_length: int, weight_decay: float, learning_rate: float, dropout: float):
+    def __init__(self,
+                 pre_embedding: bool,
+                 feat_size: int,
+                 vocab_size: int,
+                 embed_size: int,
+                 hidden_size: int,
+                 num_classes: int,
+                 max_length: int,
+                 learning_rate: float,
+                 dropout: float):
         self.pre_embedding = pre_embedding
         self.feat_size = feat_size
         self.vocab_size = vocab_size
@@ -26,7 +38,6 @@ class BiLSTMCRFModel(object):
         self.hidden_size = hidden_size
         self.num_classes = num_classes
         self.max_length = max_length
-        self.weight_decay = weight_decay
         self.learning_rate = learning_rate
         self.dropout = dropout
 
@@ -70,18 +81,8 @@ class BiLSTMCRFModel(object):
             return cell
 
         with tf.variable_scope('recurrent'):
-            # fw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)
-            # bw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)
-            # fw_cell = tf.contrib.rnn.GRUCell(self.hidden_size, kernel_initializer=tf.contrib.layers.xavier_initializer())
-            # bw_cell = tf.contrib.rnn.GRUCell(self.hidden_size, kernel_initializer=tf.contrib.layers.xavier_initializer())
-            # output, final_state = tf.nn.bidirectional_dynamic_rnn(
-            #     fw_cell, bw_cell,
-            #     self.embedding_layer,
-            #     dtype=tf.float32,
-            #     sequence_length=tf.cast(self.length, tf.int64)
-            # )
-            fw_cells = [rnn_cell() for _ in range(2)]
-            bw_cells = [rnn_cell() for _ in range(2)]
+            fw_cells = [rnn_cell(False) for _ in range(1)]
+            bw_cells = [rnn_cell(False) for _ in range(1)]
             outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
                 fw_cells, bw_cells,
                 self.embedding_layer,
@@ -110,12 +111,12 @@ class BiLSTMCRFModel(object):
             self.unary_potentials, self.trans_params, self.length
         )
         self.loss = tf.reduce_sum(-self.ll)
-        self.l2 = self.weight_decay * (tf.reduce_sum(tf.nn.l2_loss(w1)) + tf.reduce_sum(tf.nn.l2_loss(w2)))
+        tf.summary.scalar('loss', self.loss)
 
     def _add_train_op(self):
         optimizer = tf.train.AdamOptimizer(self.learning_rate)
         params = tf.trainable_variables()
-        grads = tf.gradients(self.loss + self.l2, params)
+        grads = tf.gradients(self.loss, params)
         self._train_op = optimizer.apply_gradients(
             zip(grads, params),
             global_step=self.global_step
@@ -142,11 +143,10 @@ class BiLSTMCRFModel(object):
         output_feed = [
             self._train_op,
             self.loss,
-            self.l2
         ]
 
-        _, loss, l2 = sess.run(output_feed, input_feed)
-        return loss, l2
+        _, loss = sess.run(output_feed, input_feed)
+        return loss
 
     def test(self, sess, tokens, feats):
         viterbi_sequences, lengths = sess.run(
