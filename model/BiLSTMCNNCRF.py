@@ -36,7 +36,7 @@ class BiLSTMCNNCRFModel(object):
         self.max_seq_length = max_seq_length
         self.max_word_length = max_word_length
         self.learning_rate = learning_rate
-        self.dropout = dropout
+        self._dropout = dropout
 
         self._build_graph()
 
@@ -58,7 +58,7 @@ class BiLSTMCNNCRFModel(object):
         char_vocab = []
         with open('dev/train.char.vocab') as fp:
             for row in fp:
-                word_vocab.append(row.strip())
+                char_vocab.append(row.strip())
 
         return word_vocab, char_vocab
 
@@ -153,7 +153,7 @@ class BiLSTMCNNCRFModel(object):
                                               kernel_initializer=tf.contrib.layers.xavier_initializer())
             else:
                 cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)
-            cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=self._dropout)
+            cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=self.dropout)
             return cell
 
         with tf.variable_scope('recurrent'):
@@ -163,7 +163,7 @@ class BiLSTMCNNCRFModel(object):
                 fw_cells, bw_cells,
                 self.embedding_layer,
                 dtype=tf.float32,
-                sequence_length=tf.cast(self.length, tf.int64)
+                sequence_length=self.length
             )
             self.layer_output = tf.concat(axis=2, values=outputs)
 
@@ -183,7 +183,7 @@ class BiLSTMCNNCRFModel(object):
             self.unary_potentials, self.labels, self.length
         )
         self.viterbi_sequence, _ = tf.contrib.crf.crf_decode(
-            self.unary_potentials, self.trans_params, self.length
+            self.unary_potentials, self.trans_params, tf.cast(self.length, tf.int32)
         )
         self.loss = tf.reduce_sum(-self.ll)
 
@@ -210,7 +210,7 @@ class BiLSTMCNNCRFModel(object):
             self.tokens: tokens,
             self.chars: chars,
             self.labels: labels,
-            self.dropout: self.dropout
+            self.dropout: self._dropout
         }
         output_feed = [
             self._train_op,
@@ -237,10 +237,10 @@ class BiLSTMCNNCRFModel(object):
         return pred
 
     def decode(self, sess, tokens, chars, length, topK=5):
-        '''
+        """
         score: [seq_len, num_tags]
         transition_params: [num_tags, num_tags]
-        '''
+        """
 
         score, trans_params = sess.run([self.unary_potentials, self.trans_params], {
             self.tokens: tokens,

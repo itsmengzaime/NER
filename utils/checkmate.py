@@ -138,7 +138,8 @@ def best_checkpoint(best_checkpoint_dir, select_maximum_value=True):
 
     """
     best_checkpoints_file = os.path.join(best_checkpoint_dir, 'best_checkpoints')
-    assert os.path.exists(best_checkpoints_file)
+    if not os.path.exists(best_checkpoints_file):
+        return None
     with open(best_checkpoints_file, 'r') as f:
         best_checkpoints = json.load(f)
     best_checkpoints = [
