@@ -4,14 +4,11 @@ import os
 import gzip
 import pickle
 import logging
-import datetime
 
-import numpy as np
 import tensorflow as tf
 
 from utils.feeder.LSTMCRFeeder import LSTMCRFeeder
 from utils.feature_extractor import FeatureExtractor
-from utils.utils import conll_format
 from utils.parser import parse_conll2003
 from utils.conlleval import evaluate
 

@@ -54,19 +54,21 @@ def parse_conll2003():
     ch2idx = {}
     la2idx = {}
 
-    with open('dev/train.vocab', 'w') as fp:
+    with open('dev/train.word.vocab', 'w') as fp:
         for idx, word in enumerate(sorted(word_set)):
             w2idx[word] = idx
             fp.write(word + '\n')
 
-    for idx, char in enumerate(sorted(char_set)):
-        ch2idx[char] = idx
+    with open('dev/train.char.vocab', 'w') as fp:
+        for idx, char in enumerate(sorted(char_set)):
+            ch2idx[char] = idx
+            fp.write(char + '\n')
 
     for idx, label in enumerate(sorted(label_set)):
         la2idx[label] = idx
 
     for i in range(3):
-        dump[i][1] = [[[ch2idx.get(ch, len(ch2idx)) for ch in ssc] for ssc in sc] for sc in dump[i][1]]  # char
+        # dump[i][1] = [[[ch2idx.get(ch, len(ch2idx)) for ch in ssc] for ssc in sc] for sc in dump[i][1]]  # char
         dump[i][2] = [np.array([la2idx[la] for la in sl]) for sl in dump[i][2]]  # label
 
     with open('dev/conll.pkl', 'wb') as fp:

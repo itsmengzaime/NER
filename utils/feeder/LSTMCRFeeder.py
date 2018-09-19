@@ -28,7 +28,7 @@ class LSTMCRFeeder(object):
     def step_per_epoch(self):
         return (self.size - 1) // self._batch_size + 1
 
-    def next_epoch(self, shuffle = True):
+    def next_epoch(self, shuffle=True):
         self.offset = 0
         self.epoch += 1
 
@@ -53,7 +53,8 @@ class LSTMCRFeeder(object):
         '''
 
         # tokens = list(map(lambda x: np.pad(x, (0, self._max_length - x.shape[0]), 'constant', constant_values=0), tokens))  # Pad zeors
-        tokens = list(map(lambda x: np.pad(x, (0, self._max_length - len(x)), 'constant', constant_values=0), tokens))  # Pad zeors
+        tokens = list(map(lambda x: np.pad(x, (0, self._max_length - len(x)), 'constant', constant_values=0),
+                          tokens))  # Pad zeors
         tokens = np.array(tokens, dtype=np.str)
 
         shape = np.array([batch_size, self._max_length, self._feat_size])
@@ -118,8 +119,7 @@ class LSTMCRFeeder(object):
 
         return tokens, (indices, values, shape)
 
-
-    def val(self, tokens, feats, sample =6):
+    def val(self, tokens, feats, sample=6):
         '''
         :param tokens: [batch_size, max_length]
         :param feats: [batch_size, max_length, feat_size]
@@ -146,4 +146,3 @@ class LSTMCRFeeder(object):
         indices = np.array(indices)
 
         return tokens, (indices, values, shape)
-

@@ -134,13 +134,14 @@ class BiLSTMCRFModel(object):
 
     def _add_crf(self):
         flattened_output = tf.reshape(self.layer_output, [-1, self.hidden_size * 2])
-        flattened_feats = tf.reshape(self.dense_feats, [-1, self.feat_size])
+        # flattened_feats = tf.reshape(self.dense_feats, [-1, self.feat_size])
         with tf.variable_scope('linear'):
             w1 = tf.get_variable('w1', [self.hidden_size * 2, self.num_classes], initializer=tf.contrib.layers.xavier_initializer())
             w2 = tf.get_variable('w2', [self.feat_size, self.num_classes], initializer=tf.contrib.layers.xavier_initializer())
             b = tf.get_variable('b', [self.num_classes], initializer=tf.contrib.layers.xavier_initializer())
 
-        flattened_potentials = tf.matmul(flattened_output, w1) + tf.matmul(flattened_feats, w2) + b
+        # flattened_potentials = tf.matmul(flattened_output, w1) + tf.matmul(flattened_feats, w2) + b
+        flattened_potentials = tf.matmul(flattened_output, w1) + b
         self.unary_potentials = tf.reshape(
             flattened_potentials,
             [-1, self.max_length, self.num_classes]
