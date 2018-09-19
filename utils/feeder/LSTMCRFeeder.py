@@ -52,9 +52,9 @@ class LSTMCRFeeder(object):
         Change labels to (batch_size, max_length)
         '''
 
-        tokens = list(map(lambda x: np.pad(x, (0, self._max_length - x.shape[0]), 'constant', constant_values=0),
-                          tokens))  # Pad zeors
-        tokens = np.array(tokens, dtype=np.int32)
+        # tokens = list(map(lambda x: np.pad(x, (0, self._max_length - x.shape[0]), 'constant', constant_values=0), tokens))  # Pad zeors
+        tokens = list(map(lambda x: np.pad(x, (0, self._max_length - len(x)), 'constant', constant_values=0), tokens))  # Pad zeors
+        tokens = np.array(tokens, dtype=np.str)
 
         shape = np.array([batch_size, self._max_length, self._feat_size])
         indices = [

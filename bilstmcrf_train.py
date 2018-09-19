@@ -35,7 +35,7 @@ def atisfull():
 def conll2003():
     if not os.path.isfile('data/conll.pkl'):
         parse_conll2003()
-    with open('data/conll.pkl', 'rb') as fp:
+    with open('dev/conll.pkl', 'rb') as fp:
         train_set, val_set, test_set, dicts = pickle.load(fp)
 
     return train_set, val_set, test_set, dicts
@@ -51,17 +51,7 @@ train_x, _, train_la = train_set
 val_x, _, val_la = val_set
 test_x, _, test_la = test_set
 
-
-def dump_data(prefix, x, la):
-    with open('data/%s.data' % prefix, 'w') as fp:
-        for sw, sl in zip(x, la):
-            for a, b in zip(sw, sl):
-                fp.write(idx2w[a] + '\t' + idx2la[b] + '\n')
-            fp.write('\n')
-
-
 print('Load data...')
-
 fe = FeatureExtractor()
 fe.parse_template('data/template')
 
@@ -91,7 +81,7 @@ max_length = max(
 )
 vocab_size = len(w2idx)
 
-model = BiLSTMCRFModel(False, fe.feat_size, vocab_size, 128, 256, num_classes, max_length, 0.001, 0.5)
+model = BiLSTMCRFModel(True, fe.feat_size, vocab_size, 50, 256, num_classes, max_length, 0.001, 0.5)
 
 print('Start training...')
 print('Train size = %d' % len(train_x))
@@ -102,7 +92,7 @@ print('Num classes = %d' % num_classes)
 start_epoch = 1
 max_epoch = 20
 
-saver = tf.train.Saver()
+saver = tf.train.Saver(max_to_keep=10)
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -118,13 +108,11 @@ if latest_checkpoint:
     saver.restore(sess, latest_checkpoint)
 else:
     sess.run(tf.global_variables_initializer())
+sess.run(tf.tables_initializer())
 
 train_feeder = LSTMCRFeeder(train_x, train_feats, train_la, max_length, model.feat_size, 16)
 val_feeder = LSTMCRFeeder(val_x, val_feats, val_la, max_length, model.feat_size, 16)
 test_feeder = LSTMCRFeeder(test_x, test_feats, test_la, max_length, model.feat_size, 16)
-
-# emb = np.load('data/emb.npy')
-# model.init_embedding(sess, emb)
 
 for epoch in range(start_epoch, max_epoch + 1):
     loss = 0

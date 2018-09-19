@@ -43,8 +43,25 @@ class BiLSTMCRFModel(object):
 
         self._build_graph()
 
+    def _load_pretrained_senna(self):
+        vocab = []
+        with open('senna/pretrained.vocab') as fp:
+            for row in fp:
+                vocab.append(row.strip())
+        emb = np.genfromtxt('senna/pretrained.emb', delimiter=' ', dtype=np.float)
+
+        return vocab, emb
+
+    def _load_train_vocab(self):
+        vocab = []
+        with open('dev/train.vocab') as fp:
+            for row in fp:
+                vocab.append(row.strip())
+
+        return vocab
+
     def _add_placeholders(self):
-        self._tokens = tf.placeholder(tf.int32, [None, self.max_length])
+        self._tokens = tf.placeholder(tf.string, [None, self.max_length])
         self._dropout = tf.placeholder(tf.float32)
         self._feats = tf.sparse_placeholder(
             tf.float32,
@@ -55,20 +72,44 @@ class BiLSTMCRFModel(object):
         self.mask = tf.sign(tf.reduce_sum(self.dense_feats, axis=2))
         self.length = tf.cast(tf.reduce_sum(self.mask, axis=1), tf.int32)
 
-    def init_embedding(self, sess, emb):
-        if self.pre_embedding:
-            sess.run(self._embedding_init_op, {self._embedding_placeholder: emb})
-
     def _add_embedding(self):
         with tf.variable_scope('embedding'):
             if self.pre_embedding:
-                embed = tf.Variable(tf.constant(0.0, shape=[self.vocab_size, self.embed_size]), trainable=True, name="embed")
-                self._embedding_placeholder = tf.placeholder(tf.float32, [self.vocab_size, self.embed_size])
-                self._embedding_init_op = embed.assign(self._embedding_placeholder)
+                pretrained_vocab, pretrained_embs = self._load_pretrained_senna()
+                train_vocab = self._load_train_vocab()
+                only_in_train = list(set(train_vocab) - set(pretrained_vocab))
+                vocab = pretrained_vocab + only_in_train
+
+                vocab_lookup = tf.contrib.lookup.index_table_from_tensor(
+                    mapping=tf.constant(vocab),
+                    default_value=len(vocab)
+                )
+                string_tensor = vocab_lookup.lookup(self._tokens)
+
+                pretrained_embs = tf.get_variable(
+                    name='embs_pretrained',
+                    initializer=tf.constant_initializer(np.asarray(pretrained_embs), dtype=tf.float32),
+                    shape=pretrained_embs.shape,
+                    trainable=False
+                )
+                train_embs = tf.get_variable(
+                    name='embs_only_in_train',
+                    shape=[len(only_in_train), self.embed_size],
+                    initializer=tf.random_uniform_initializer(-0.04, 0.04),
+                    trainable=True
+                )
+                unk_embs = tf.get_variable(
+                    name='embs_unk',
+                    shape=[1, self.embed_size],
+                    initializer=tf.random_uniform_initializer(-0.04, 0.04),
+                    trainable=False
+                )
+
+                embeddings = tf.concat([pretrained_embs, train_embs, unk_embs], axis=0)
             else:
-                embed = tf.get_variable('embed', [self.vocab_size, self.embed_size])
-            embed = tf.nn.dropout(embed, keep_prob=self._dropout, noise_shape=[self.vocab_size, 1])
-            self.embedding_layer = tf.nn.embedding_lookup(embed, self._tokens)
+                embeddings = tf.get_variable('embed', [self.vocab_size, self.embed_size])
+            embeddings = tf.nn.dropout(embeddings, keep_prob=self._dropout)
+            self.embedding_layer = tf.nn.embedding_lookup(embeddings, string_tensor)
 
     def _add_rnn(self):
 

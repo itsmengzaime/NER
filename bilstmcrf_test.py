@@ -32,7 +32,7 @@ def atisfull():
 
 
 def conll2003():
-    with open('data/conll.pkl', 'rb') as fp:
+    with open('dev/conll.pkl', 'rb') as fp:
         train_set, val_set, test_set, dicts = pickle.load(fp)
     return train_set, val_set, test_set, dicts
 
@@ -47,20 +47,6 @@ train_x, _, train_la = train_set
 val_x, _, val_la = val_set
 test_x, _, test_la = test_set
 
-
-def dump_data(prefix, x, la):
-    wlength = 50
-    with open('data/%s.data' % prefix, 'w') as fp:
-        for sw, sl in zip(x, la):
-            for a, b in zip(sw, sl):
-                fp.write(idx2w[a].ljust(wlength) + idx2la[b].ljust(wlength) + '\n')
-            fp.write('\n')
-
-
-# print('Dump data...')
-
-# dump_data('train', train_x, train_la)
-# dump_data('test', test_x, test_la)
 
 print('Load data...')
 
@@ -92,7 +78,7 @@ max_length = max(
 )
 vocab_size = len(w2idx)
 
-model = BiLSTMCRFModel(False, fe.feat_size, vocab_size, 128, 256, num_classes, max_length, 0.001, 0.5)
+model = BiLSTMCRFModel(True, fe.feat_size, vocab_size, 50, 256, num_classes, max_length, 0.001, 0.5)
 
 print('Start testing...')
 
@@ -103,6 +89,7 @@ config.gpu_options.allow_growth = True
 
 sess = tf.Session(config=config)
 saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir='checkpoints'))
+sess.run(tf.tables_initializer())
 
 
 val_feeder = LSTMCRFeeder(val_x, val_feats, val_la, max_length, model.feat_size, 16)
