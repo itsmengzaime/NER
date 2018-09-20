@@ -93,15 +93,13 @@ class BiLSTMCNNCRFModel(object):
                 train_embs = tf.get_variable(
                     name='embs_only_in_train',
                     shape=[len(only_in_train), self.word_embed_size],
-                    initializer=tf.random_uniform_initializer(-sqrt(3 / self.word_embed_size),
-                                                              sqrt(3 / self.word_embed_size)),
+                    initializer=tf.contrib.layers.xavier_initializer(),
                     trainable=True
                 )
                 unk_embs = tf.get_variable(
                     name='embs_unk',
                     shape=[1, self.word_embed_size],
-                    initializer=tf.random_uniform_initializer(-sqrt(3 / self.word_embed_size),
-                                                              sqrt(3 / self.word_embed_size)),
+                    initializer=tf.contrib.layers.xavier_initializer(),
                     trainable=False
                 )
                 word_embeddings = tf.concat([pretrained_embs, train_embs, unk_embs], axis=0)
@@ -115,14 +113,12 @@ class BiLSTMCNNCRFModel(object):
                 )
                 word_string_tensor = vocab_lookup.lookup(self.tokens)
 
-            # word_embeddings = tf.nn.dropout(word_embeddings, keep_prob=self.dropout)
             self.word_embedding_layer = tf.nn.embedding_lookup(word_embeddings, word_string_tensor)
 
             char_embeddings = tf.get_variable(
                 name='embs_char',
                 shape=[len(train_char_vocab) + 1, self.char_embed_size],
-                initializer=tf.random_uniform_initializer(-sqrt(3 / self.char_embed_size),
-                                                          sqrt(3 / self.char_embed_size)),
+                initializer=tf.contrib.layers.xavier_initializer(),
                 trainable=True
             )
             vocab_lookup = tf.contrib.lookup.index_table_from_tensor(
@@ -131,20 +127,25 @@ class BiLSTMCNNCRFModel(object):
             )
             char_string_tensor = vocab_lookup.lookup(self.chars)
 
-            # char_embeddings = tf.nn.dropout(char_embeddings, keep_prob=self.dropout)
             self.char_embedding_layer = tf.nn.embedding_lookup(char_embeddings, char_string_tensor)
 
     def _add_cnn(self):
         with tf.variable_scope('cnn'):
             # char_embed: [batch_size, max_seq_length, max_char_length, char_embed_size]
-            flat = tf.reshape(self.char_embedding_layer, (-1, self.max_word_length, self.char_embed_size))
-            conv = tf.layers.conv1d(flat, filters=self.filter_size, kernel_size=3,
-                                    padding='same')  # [batch_size, max_seq_length, max_char_length, 30]
-            conv = tf.reshape(conv, (-1, self.max_seq_length, self.max_word_length, self.char_embed_size))
-            pool = tf.reduce_max(conv, axis=2)  # [batch_size, max_seq_length, 30]
+            # A dropout layer is applied before character embeddings are input to CNN
+            cnn_inputs = tf.nn.dropout(self.char_embedding_layer, keep_prob=self.dropout)
+
+            flat = tf.reshape(cnn_inputs, (-1, self.max_word_length, self.char_embed_size))
+            conv = tf.layers.conv1d(flat,
+                                    filters=self.filter_size,
+                                    kernel_size=3,
+                                    padding='same',
+                                    activation=tf.nn.relu,
+                                    kernel_initializer=tf.contrib.layers.xavier_initializer())  # [batch_size, max_seq_length, max_char_length, filters]
+            pool = tf.reduce_max(conv, axis=1)  # [batch_size, max_seq_length, filters]
+            pool = tf.reshape(pool, (-1, self.max_seq_length, self.filter_size))
 
         self.embedding_layer = tf.concat([self.word_embedding_layer, pool], axis=2)
-        self.embedding_layer = tf.nn.dropout(self.embedding_layer, keep_prob=self.dropout)
 
     def _add_rnn(self):
         def rnn_cell(gru=True):
@@ -156,12 +157,15 @@ class BiLSTMCNNCRFModel(object):
             cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=self.dropout)
             return cell
 
+        # dropout layers are applied on both the input and output vectors of BiLSTM
+        rnn_inputs = tf.nn.dropout(self.embedding_layer, keep_prob=self.dropout)
+
         with tf.variable_scope('recurrent'):
             fw_cells = [rnn_cell(False) for _ in range(1)]
             bw_cells = [rnn_cell(False) for _ in range(1)]
             outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
                 fw_cells, bw_cells,
-                self.embedding_layer,
+                rnn_inputs,
                 dtype=tf.float32,
                 sequence_length=self.length
             )

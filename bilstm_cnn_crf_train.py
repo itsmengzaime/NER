@@ -47,14 +47,14 @@ max_word_length = max(
 
 model = BiLSTMCNNCRFModel(
     True,
-    50,  # Word embedding size
+    50,   # Word embedding size
     30,   # Character embedding size
     200,  # LSTM state size
     30,   # Filter size
     num_classes,
     max_seq_length,
     max_word_length,
-    0.015,
+    0.001,
     0.5)
 
 print('Start training...')
@@ -82,14 +82,13 @@ logging.basicConfig(level=logging.DEBUG,
                     datefmt='%m-%d %H:%M',
                     handlers=[logging.FileHandler('logs/train.log'), logging.StreamHandler()])
 
-# latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir='checkpoints')
-# if latest_checkpoint:
-#     saver.restore(sess, latest_checkpoint)
+latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir='checkpoints')
+if latest_checkpoint:
+    saver.restore(sess, latest_checkpoint)
 
-
-best_checkpoint = best_checkpoint('checkpoints/best/', True)
-if best_checkpoint:
-    saver.restore(sess, best_checkpoint)
+# best_checkpoint = best_checkpoint('checkpoints/best/', True)
+# if best_checkpoint:
+#     saver.restore(sess, best_checkpoint)
 else:
     sess.run(tf.global_variables_initializer())
 sess.run(tf.tables_initializer())
@@ -98,9 +97,9 @@ sess.run(tf.tables_initializer())
 # tokens, chars, labels = feeder.feed()
 # length = sess.run(model.length, {model.tokens: tokens, model.chars: chars})
 
-train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 10)
-val_feeder = LSTMCNNCRFeeder(val_x, val_chars, val_la, max_seq_length, max_word_length, 10)
-test_feeder = LSTMCNNCRFeeder(test_x, test_chars, test_la, max_seq_length, max_word_length, 10)
+train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 16)
+val_feeder = LSTMCNNCRFeeder(val_x, val_chars, val_la, max_seq_length, max_word_length, 16)
+test_feeder = LSTMCNNCRFeeder(test_x, test_chars, test_la, max_seq_length, max_word_length, 16)
 
 for epoch in range(start_epoch, max_epoch + 1):
     loss = 0
