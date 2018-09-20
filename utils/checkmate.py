@@ -52,7 +52,7 @@ class BestCheckpointSaver(object):
             sess: A tf.Session to use to save the checkpoint
             global_step_tensor: A `tf.Tensor` represent the global step
         """
-        global_step = sess.run(global_step_tensor)
+        global_step = global_step_tensor
         current_ckpt = 'best.ckpt-{}'.format(global_step)
         value = float(value)
         if not os.path.exists(self.best_checkpoints_file):

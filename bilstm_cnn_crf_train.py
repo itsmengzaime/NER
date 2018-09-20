@@ -64,11 +64,11 @@ print('Test size = %d' % len(test_x))
 print('Num classes = %d' % num_classes)
 
 start_epoch = 1
-max_epoch = 10
+max_epoch = 20
 
 saver = tf.train.Saver(max_to_keep=10)
 best_saver = BestCheckpointSaver(
-    save_dir='best_checkpoints',
+    save_dir='checkpoints/best',
     num_to_keep=2,
     maximize=True
 )
