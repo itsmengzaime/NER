@@ -109,7 +109,7 @@ for epoch in range(start_epoch, max_epoch + 1):
         step_loss = model.train_step(sess, tokens, chars, labels)
         loss += step_loss
 
-        logging.info('epoch: %d, size: %d/%d, step_loss: %f, epoch_loss: %f' %
+        logging.info('Epoch: %d, size: %d/%d, step_loss: %f, epoch_loss: %f' %
                      (epoch, train_feeder.offset, train_feeder.size, step_loss, loss)
                      )
 
