@@ -38,8 +38,12 @@ def parse_conll2003():
             else:
                 data = row.split(' ')
                 token = data[0].strip().lower()
-                chars = ['0' if ch.isdigit() else ch for ch in token][:max_word_len]
+                chars = ['0' if ch.isdigit() else ch for ch in token]
                 label = data[-1].strip()
+
+                if len(chars) > max_word_len:
+                    half = max_word_len / 2
+                    chars = chars[:half] + chars[-(max_word_len - half):]
 
                 sx.append(token)
                 sc.append(chars)
