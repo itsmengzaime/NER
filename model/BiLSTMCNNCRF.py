@@ -133,17 +133,27 @@ class BiLSTMCNNCRFModel(object):
         with tf.variable_scope('cnn'):
             # A dropout layer is applied before character embeddings are input to CNN
             cnn_inputs = tf.nn.dropout(self.char_embedding_layer, keep_prob=self.dropout)
+            cnn_inputs = tf.reshape(cnn_inputs, (-1, self.max_word_length, self.char_embed_size, 1))
 
-            flat = tf.reshape(cnn_inputs, (-1, self.max_word_length, self.char_embed_size))
-            conv = tf.layers.conv1d(flat,
+            # _filter = tf.get_variable(
+            #     name="cnn_filter",
+            #     shape=[self.max_word_length, self.char_embed_size, 1, self.filter_size],
+            #     initializer=tf.contrib.layers.xavier_initializer(),
+            #     trainable=True
+            # )
+
+            conv = tf.layers.conv2d(cnn_inputs,
                                     filters=self.filter_size,
-                                    kernel_size=3,
-                                    padding='valid',
+                                    kernel_size=(3, self.char_embed_size),
+                                    padding='VALID',
                                     activation=tf.nn.relu,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
-            # [batch_size, max_seq_length, max_char_length, filters]
+            pool = tf.nn.max_pool(conv,
+                                  [1, self.max_word_length - 2, 1, 1],
+                                  [1, 1, 1, 1],
+                                  'VALID')
 
-            pool = tf.reduce_max(conv, axis=1)  # [batch_size, max_seq_length, filters]
+            pool = tf.squeeze(pool, [1, 2])
             pool = tf.reshape(pool, (-1, self.max_seq_length, self.filter_size))
 
         self.embedding_layer = tf.concat([self.word_embedding_layer, pool], axis=2)
@@ -193,15 +203,6 @@ class BiLSTMCNNCRFModel(object):
         self.loss = tf.reduce_sum(-self.ll)
 
     def _add_train_op(self):
-        # lr = tf.train.exponential_decay(
-        #     self.learning_rate,
-        #     self.global_step,
-        #     878,
-        #     0.95,
-        #     staircase=True
-        # )
-        # optimizer = tf.train.GradientDescentOptimizer(0.001)
-        # self._train_op = optimizer.minimize(self.loss, global_step=self.global_step)
         optimizer = tf.train.AdamOptimizer(self.learning_rate)
         params = tf.trainable_variables()
         gradients = tf.gradients(self.loss, params)
