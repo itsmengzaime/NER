@@ -3,6 +3,7 @@
 import pickle
 import numpy as np
 
+max_word_len = 20
 
 def parse_conll2003():
     train_file = open('data/train.txt')
@@ -37,16 +38,17 @@ def parse_conll2003():
             else:
                 data = row.split(' ')
                 token = data[0].strip().lower()
+                chars = ['0' if ch.isdigit() else ch for ch in token][:max_word_len]
                 label = data[-1].strip()
 
                 sx.append(token)
-                sc.append([ch for ch in token])
+                sc.append(chars)
                 sl.append(label)
 
                 if prefix == 'train':
                     # Should only update word in train set
                     word_set.add(token)
-                    char_set.update(*token)
+                    char_set.update(*chars)
                     label_set.add(label)
         dump.append([x, ch, la])
 

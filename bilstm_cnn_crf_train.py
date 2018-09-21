@@ -54,7 +54,7 @@ model = BiLSTMCNNCRFModel(
     num_classes,
     max_seq_length,
     max_word_length,
-    0.015,
+    0.001,
     0.5)
 
 print('Start training...')
@@ -63,13 +63,13 @@ print('Val size = %d' % len(val_x))
 print('Test size = %d' % len(test_x))
 print('Num classes = %d' % num_classes)
 
-start_epoch = 76
+start_epoch = 1
 max_epoch = 1000
 
 saver = tf.train.Saver()
 best_saver = BestCheckpointSaver(
     save_dir='checkpoints/best',
-    num_to_keep=2,
+    num_to_keep=1,
     maximize=True
 )
 

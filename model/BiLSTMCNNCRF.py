@@ -193,22 +193,23 @@ class BiLSTMCNNCRFModel(object):
         self.loss = tf.reduce_sum(-self.ll)
 
     def _add_train_op(self):
-        lr = tf.train.exponential_decay(
-            self.learning_rate,
-            self.global_step,
-            878,
-            0.95,
-            staircase=True
-        )
-        optimizer = tf.train.GradientDescentOptimizer(0.001)
-        self._train_op = optimizer.minimize(self.loss, global_step=self.global_step)
-        # optimizer = tf.train.AdamOptimizer(self.learning_rate)
-        # params = tf.trainable_variables()
-        # grads = tf.gradients(self.loss, params)
-        # self._train_op = optimizer.apply_gradients(
-        #     zip(grads, params),
-        #     global_step=self.global_step
+        # lr = tf.train.exponential_decay(
+        #     self.learning_rate,
+        #     self.global_step,
+        #     878,
+        #     0.95,
+        #     staircase=True
         # )
+        # optimizer = tf.train.GradientDescentOptimizer(0.001)
+        # self._train_op = optimizer.minimize(self.loss, global_step=self.global_step)
+        optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        params = tf.trainable_variables()
+        gradients = tf.gradients(self.loss, params)
+        clipped_gradients, norm = tf.clip_by_global_norm(gradients, 5.0)
+        self._train_op = optimizer.apply_gradients(
+            zip(clipped_gradients, params),
+            global_step=self.global_step
+        )
 
     def _build_graph(self):
         self.global_step = tf.Variable(0, trainable=False)
