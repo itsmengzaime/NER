@@ -88,7 +88,7 @@ class BiLSTMCNNCRFModel(object):
                     name='embs_pretrained',
                     initializer=tf.constant_initializer(np.asarray(pretrained_embs), dtype=tf.float32),
                     shape=pretrained_embs.shape,
-                    trainable=False
+                    trainable=True
                 )
                 train_embs = tf.get_variable(
                     name='embs_only_in_train',
@@ -100,7 +100,7 @@ class BiLSTMCNNCRFModel(object):
                     name='embs_unk',
                     shape=[1, self.word_embed_size],
                     initializer=tf.contrib.layers.xavier_initializer(),
-                    trainable=False
+                    trainable=True
                 )
                 word_embeddings = tf.concat([pretrained_embs, train_embs, unk_embs], axis=0)
             else:
@@ -131,7 +131,6 @@ class BiLSTMCNNCRFModel(object):
 
     def _add_cnn(self):
         with tf.variable_scope('cnn'):
-            # char_embed: [batch_size, max_seq_length, max_char_length, char_embed_size]
             # A dropout layer is applied before character embeddings are input to CNN
             cnn_inputs = tf.nn.dropout(self.char_embedding_layer, keep_prob=self.dropout)
 
@@ -139,9 +138,11 @@ class BiLSTMCNNCRFModel(object):
             conv = tf.layers.conv1d(flat,
                                     filters=self.filter_size,
                                     kernel_size=3,
-                                    padding='same',
+                                    padding='valid',
                                     activation=tf.nn.relu,
-                                    kernel_initializer=tf.contrib.layers.xavier_initializer())  # [batch_size, max_seq_length, max_char_length, filters]
+                                    kernel_initializer=tf.contrib.layers.xavier_initializer())
+            # [batch_size, max_seq_length, max_char_length, filters]
+
             pool = tf.reduce_max(conv, axis=1)  # [batch_size, max_seq_length, filters]
             pool = tf.reshape(pool, (-1, self.max_seq_length, self.filter_size))
 
@@ -192,13 +193,22 @@ class BiLSTMCNNCRFModel(object):
         self.loss = tf.reduce_sum(-self.ll)
 
     def _add_train_op(self):
-        optimizer = tf.train.AdamOptimizer(self.learning_rate)
-        params = tf.trainable_variables()
-        grads = tf.gradients(self.loss, params)
-        self._train_op = optimizer.apply_gradients(
-            zip(grads, params),
-            global_step=self.global_step
+        lr = tf.train.exponential_decay(
+            self.learning_rate,
+            self.global_step,
+            878,
+            0.95,
+            staircase=True
         )
+        optimizer = tf.train.GradientDescentOptimizer(0.001)
+        self._train_op = optimizer.minimize(self.loss, global_step=self.global_step)
+        # optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        # params = tf.trainable_variables()
+        # grads = tf.gradients(self.loss, params)
+        # self._train_op = optimizer.apply_gradients(
+        #     zip(grads, params),
+        #     global_step=self.global_step
+        # )
 
     def _build_graph(self):
         self.global_step = tf.Variable(0, trainable=False)
