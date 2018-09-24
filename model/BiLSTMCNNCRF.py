@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from gensim.models import KeyedVectors
 
-from utils.utils import viterbi_decode_topk
+from utils.utils import viterbi_decode_topk, decay_learning_rate
 
 
 class BiLSTMCNNCRFModel(object):
@@ -211,15 +211,15 @@ class BiLSTMCNNCRFModel(object):
         self.loss = tf.reduce_sum(-self.ll)
 
     def _add_train_op(self):
-        '''
-        learning_rate = tf.train.exponential_decay(self.learning_rate,
-                                                   self.global_step,
-                                                   878,
-                                                   0.95,
-                                                   staircase=True)
-        optimizer = tf.train.AdamOptimizer(learning_rate)
-        '''
-        optimizer = tf.train.AdamOptimizer(0.001)
+        learning_rate = decay_learning_rate(self.learning_rate,
+                                            self.global_step,
+                                            878,
+                                            0.05)
+        optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+        # optimizer = tf.train.AdamOptimizer(0.001)
+
+        self.lr = learning_rate
+
         params = tf.trainable_variables()
         gradients = tf.gradients(self.loss, params)
         clipped_gradients, norm = tf.clip_by_global_norm(gradients, 5.0)
@@ -245,11 +245,15 @@ class BiLSTMCNNCRFModel(object):
             self.dropout: self._dropout
         }
         output_feed = [
+            self.lr,
             self._train_op,
             self.loss
         ]
 
-        _, loss = sess.run(output_feed, input_feed)
+        lr, _, loss = sess.run(output_feed, input_feed)
+
+        # print("Learning Rate =", lr)
+
         return loss
 
     def test(self, sess, tokens, chars):
