@@ -47,10 +47,11 @@ max_word_length = max(
 
 model = BiLSTMCNNCRFModel(
     True,
-    100,   # Word embedding size
+    100,  # Word embedding size
     30,   # Character embedding size
     100,  # LSTM state size
-    30,   # Filter size
+    30,   # Filter num
+    3,    # Filter size
     num_classes,
     max_seq_length,
     max_word_length,
@@ -118,8 +119,8 @@ for epoch in range(start_epoch, max_epoch + 1):
         tokens, chars, labels = val_feeder.feed()
         pred = model.test(sess, tokens, chars)
         preds.extend(pred)
-    true_seqs = [idx2la[la] for sl in val_la for la in sl ]
-    pred_seqs = [idx2la[la] for sl in preds for la in sl ]
+    true_seqs = [idx2la[la] for sl in val_la for la in sl]
+    pred_seqs = [idx2la[la] for sl in preds for la in sl]
     ll = min(len(true_seqs), len(pred_seqs))
     _, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
 

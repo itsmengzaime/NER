@@ -20,6 +20,7 @@ class BiLSTMCNNCRFModel(object):
                  word_embed_size: int,
                  char_embed_size: int,
                  hidden_size: int,
+                 filter_num: int,
                  filter_size: int,
                  num_classes: int,
                  max_seq_length: int,
@@ -30,6 +31,7 @@ class BiLSTMCNNCRFModel(object):
         self.word_embed_size = word_embed_size
         self.char_embed_size = char_embed_size
         self.hidden_size = hidden_size
+        self.filter_num = filter_num
         self.filter_size = filter_size
         self.num_classes = num_classes
         self.max_seq_length = max_seq_length
@@ -139,32 +141,29 @@ class BiLSTMCNNCRFModel(object):
 
     def _add_cnn(self):
         with tf.variable_scope('cnn'):
+            cnn_inputs = tf.reshape(self.char_embedding_layer, (-1, self.max_word_length, self.char_embed_size, 1))
+
             # A dropout layer is applied before character embeddings are input to CNN
-            cnn_inputs = tf.nn.dropout(self.char_embedding_layer, keep_prob=self.dropout)
-            cnn_inputs = tf.reshape(cnn_inputs, (-1, self.max_word_length, self.char_embed_size, 1))
+            cnn_inputs = tf.nn.dropout(cnn_inputs, keep_prob=self.dropout)
 
-            # _filter = tf.get_variable(
-            #     name="cnn_filter",
-            #     shape=[self.max_word_length, self.char_embed_size, 1, self.filter_size],
-            #     initializer=tf.contrib.layers.xavier_initializer(),
-            #     trainable=True
-            # )
+            filter_shape = [self.filter_size, self.char_embed_size, 1, self.filter_num]
+            w = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="cnn_w")
+            b = tf.Variable(tf.constant(0.1, shape=[self.filter_num]), name="cnn_b")
+            conv = tf.nn.conv2d(
+                cnn_inputs,
+                w,
+                strides=[1, 1, 1, 1],
+                padding="VALID")
+            h = tf.nn.relu(tf.nn.bias_add(conv, b), name="cnn_relu")
+            pool = tf.nn.max_pool(
+                h,
+                ksize=[1, self.max_word_length - self.filter_size + 1, 1, 1],
+                strides=[1, 1, 1, 1],
+                padding='VALID')
 
-            conv = tf.layers.conv2d(cnn_inputs,
-                                    filters=self.filter_size,
-                                    kernel_size=(3, self.char_embed_size),
-                                    padding='VALID',
-                                    activation=tf.nn.relu,
-                                    kernel_initializer=tf.contrib.layers.xavier_initializer())
-            pool = tf.nn.max_pool(conv,
-                                  [1, self.max_word_length - 2, 1, 1],
-                                  [1, 1, 1, 1],
-                                  'VALID')
+            pool = tf.reshape(pool, (-1, self.max_seq_length, self.filter_num))
 
-            pool = tf.squeeze(pool, [1, 2])
-            pool = tf.reshape(pool, (-1, self.max_seq_length, self.filter_size))
-
-        self.embedding_layer = tf.concat([self.word_embedding_layer, pool], axis=2)
+        self.embedding_layer = tf.concat([self.word_embedding_layer, pool], 2)
 
     def _add_rnn(self):
         def rnn_cell(gru=True):
@@ -188,7 +187,7 @@ class BiLSTMCNNCRFModel(object):
                 dtype=tf.float32,
                 sequence_length=self.length
             )
-            self.layer_output = tf.concat(axis=2, values=outputs)
+            self.layer_output = tf.concat(values=outputs, axis=2)
 
     def _add_crf(self):
         flattened_output = tf.reshape(self.layer_output, [-1, self.hidden_size * 2])
@@ -208,7 +207,7 @@ class BiLSTMCNNCRFModel(object):
         self.viterbi_sequence, _ = tf.contrib.crf.crf_decode(
             self.unary_potentials, self.trans_params, tf.cast(self.length, tf.int32)
         )
-        self.loss = tf.reduce_sum(-self.ll)
+        self.loss = -tf.reduce_sum(self.ll)
 
     def _add_train_op(self):
         learning_rate = decay_learning_rate(self.learning_rate,
