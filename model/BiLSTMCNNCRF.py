@@ -211,7 +211,15 @@ class BiLSTMCNNCRFModel(object):
         self.loss = tf.reduce_sum(-self.ll)
 
     def _add_train_op(self):
-        optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        '''
+        learning_rate = tf.train.exponential_decay(self.learning_rate,
+                                                   self.global_step,
+                                                   878,
+                                                   0.95,
+                                                   staircase=True)
+        optimizer = tf.train.AdamOptimizer(learning_rate)
+        '''
+        optimizer = tf.train.AdamOptimizer(0.001)
         params = tf.trainable_variables()
         gradients = tf.gradients(self.loss, params)
         clipped_gradients, norm = tf.clip_by_global_norm(gradients, 5.0)

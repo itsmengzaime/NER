@@ -49,12 +49,12 @@ model = BiLSTMCNNCRFModel(
     True,
     100,   # Word embedding size
     30,   # Character embedding size
-    200,  # LSTM state size
+    100,  # LSTM state size
     30,   # Filter size
     num_classes,
     max_seq_length,
     max_word_length,
-    0.001,
+    0.015,
     0.5)
 
 print('Start training...')

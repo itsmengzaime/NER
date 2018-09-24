@@ -2,14 +2,45 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-import random
-
 import numpy as np
-import bottleneck as bn
+
+import tensorflow as tf
+from tensorflow.python.eager import context
+from tensorflow.python.framework import ops
+from tensorflow.python.ops import math_ops
 
 from utils.conlleval import evaluate_conll_file
 
+
+def decay_learning_rate(learning_rate,
+                        global_step,
+                        decay_steps,
+                        decay_rate,
+                        name=None):
+    if global_step is None:
+        raise ValueError("global_step is required for exponential_decay.")
+    with ops.name_scope(
+            name, "ExponentialDecay",
+            [learning_rate, global_step, decay_steps, decay_rate]) as name:
+        learning_rate = ops.convert_to_tensor(learning_rate, name="learning_rate")
+        dtype = learning_rate.dtype
+        decay_steps = math_ops.cast(decay_steps, dtype)
+        decay_rate = math_ops.cast(decay_rate, dtype)
+
+        def decayed_lr():
+            """Helper to recompute learning rate; most helpful in eager-mode."""
+            global_step_recomp = math_ops.cast(global_step, dtype)
+            p = global_step_recomp / decay_steps
+            p = math_ops.floor(p)
+
+            return math_ops.divide(
+                learning_rate, math_ops.add(tf.constant(1.0, dtype=tf.float32), math_ops.multiply(decay_rate, p))
+            )
+
+        if not context.executing_eagerly():
+            decayed_lr = decayed_lr()
+
+        return decayed_lr
 
 
 def conll_format(token, la_true, la_pred, idx2w, idx2la, prefix):
@@ -28,7 +59,7 @@ def conll_format(token, la_true, la_pred, idx2w, idx2la, prefix):
     return f1
 
 
-def viterbi_decode_topk(score, transition_params, topK = 1):
+def viterbi_decode_topk(score, transition_params, topK=1):
     """Decode the top K scoring sequence of tags outside of TensorFlow.
 
     This should only be used at test time.
@@ -49,7 +80,7 @@ def viterbi_decode_topk(score, transition_params, topK = 1):
     trellis = np.zeros((topK, seq_len, num_tags))
     backpointers = np.zeros_like(trellis, dtype=np.int32)
     trellis[0, 0] = score[0]
-    trellis[1:topK, 0] = -1e16 # Mask
+    trellis[1:topK, 0] = -1e16  # Mask
 
     # Compute score
     for t in range(1, seq_len):
@@ -58,13 +89,13 @@ def viterbi_decode_topk(score, transition_params, topK = 1):
             tmp = np.expand_dims(trellis[k, t - 1], 1) + transition_params
             v[k * num_tags: (k + 1) * num_tags, :] = tmp
 
-        args = np.argsort(-v, 0) # Desc
+        args = np.argsort(-v, 0)  # Desc
         for k in range(topK):
             trellis[k, t] = score[t] + v[args[k, :], np.arange(num_tags)]
             backpointers[k, t] = args[k, :]
 
     # Decode topK
-    v = trellis[:, -1, :] # [topK, num_tags]
+    v = trellis[:, -1, :]  # [topK, num_tags]
     v = v.flatten()
 
     args = np.argsort(-v)[:topK]
