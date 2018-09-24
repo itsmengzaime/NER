@@ -13,6 +13,8 @@ from utils.checkmate import BestCheckpointSaver, best_checkpoint
 
 from model.BiLSTMCNNCRF import BiLSTMCNNCRFModel
 
+from bilm import Batcher, BidirectionalLanguageModel
+
 
 def conll2003():
     if not os.path.isfile('dev/conll.pkl'):
@@ -33,6 +35,10 @@ train_x, train_chars, train_la = train_set
 val_x, val_chars, val_la = val_set
 test_x, test_chars, test_la = test_set
 
+print('Load elmo...')
+elmo_batcher = Batcher('dev/train.word.vocab', 20)
+ekmo_bilm = BidirectionalLanguageModel('', '', trainable=False)
+
 print('Load model...')
 
 num_classes = len(la2idx.keys())
@@ -47,7 +53,7 @@ max_word_length = max(
 
 model = BiLSTMCNNCRFModel(
     True,
-    100,   # Word embedding size
+    50,   # Word embedding size
     30,   # Character embedding size
     200,  # LSTM state size
     30,   # Filter size
@@ -85,10 +91,6 @@ logging.basicConfig(level=logging.DEBUG,
 latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir='checkpoints')
 if latest_checkpoint:
     saver.restore(sess, latest_checkpoint)
-
-# best_checkpoint = best_checkpoint('checkpoints/best/', True)
-# if best_checkpoint:
-#     saver.restore(sess, best_checkpoint)
 else:
     sess.run(tf.global_variables_initializer())
 sess.run(tf.tables_initializer())
@@ -109,7 +111,7 @@ for epoch in range(start_epoch, max_epoch + 1):
         step_loss = model.train_step(sess, tokens, chars, labels)
         loss += step_loss
 
-        logging.info('Epoch: %d, size: %d/%d, step_loss: %f, epoch_loss: %f' %
+        logging.info('epoch: %d, size: %d/%d, step_loss: %f, epoch_loss: %f' %
                      (epoch, train_feeder.offset, train_feeder.size, step_loss, loss)
                      )
 

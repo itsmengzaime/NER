@@ -4,6 +4,8 @@ data/
 senna/
 logs/
 eval/
+bilm/
+glove/
 
 ### Python template
 # Byte-compiled / optimized / DLL files

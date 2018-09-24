@@ -2,9 +2,10 @@
 
 import numpy as np
 import tensorflow as tf
-from gensim.models import KeyedVectors
+import tensorflow.contrib as tc
 
 from utils.utils import viterbi_decode_topk
+from bilm import BidirectionalLanguageModel, weight_layers
 
 
 class BiLSTMCNNCRFModel(object):
@@ -25,7 +26,10 @@ class BiLSTMCNNCRFModel(object):
                  max_seq_length: int,
                  max_word_length: int,
                  learning_rate: float,
-                 dropout: float):
+                 dropout: float,
+                 elmo_bilm,
+                 elmo_mode,
+                 elmo_batcher):
         self.pre_embedding = pre_embedding
         self.word_embed_size = word_embed_size
         self.char_embed_size = char_embed_size
@@ -37,6 +41,10 @@ class BiLSTMCNNCRFModel(object):
         self.learning_rate = learning_rate
         self._dropout = dropout
 
+        self.elmo_bilm = elmo_bilm
+        self.elmo_mode = elmo_mode
+        self.elmo_batcher = elmo_batcher
+
         self._build_graph()
 
     def _load_pretrained_senna(self):
@@ -45,14 +53,6 @@ class BiLSTMCNNCRFModel(object):
             for row in fp:
                 vocab.append(row.strip())
         emb = np.genfromtxt('senna/pretrained.emb', delimiter=' ', dtype=np.float)
-
-        return vocab, emb
-
-    def _load_pretrained_glove(self):
-        model = KeyedVectors.load_word2vec_format('glove/glove.6B.100d.txt')
-
-        vocab = list(model.vocab.keys())
-        emb = model.vectors
 
         return vocab, emb
 
@@ -76,12 +76,14 @@ class BiLSTMCNNCRFModel(object):
         self.labels = tf.placeholder(tf.int32, [None, self.max_seq_length])
         self.length = tf.count_nonzero(self.tokens, axis=1)
 
+        # elmo
+        self.elmo_p = tf.placeholder(tf.int32, [None, None, None])
+
     def _add_embedding(self):
         with tf.variable_scope('embedding'):
             train_word_vocab, train_char_vocab = self._load_train_vocab()
             if self.pre_embedding:
-                # pretrained_vocab, pretrained_embs = self._load_pretrained_senna()
-                pretrained_vocab, pretrained_embs = self._load_pretrained_glove()
+                pretrained_vocab, pretrained_embs = self._load_pretrained_senna()
 
                 only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
                 vocab = pretrained_vocab + only_in_train
@@ -141,30 +143,38 @@ class BiLSTMCNNCRFModel(object):
         with tf.variable_scope('cnn'):
             # A dropout layer is applied before character embeddings are input to CNN
             cnn_inputs = tf.nn.dropout(self.char_embedding_layer, keep_prob=self.dropout)
-            cnn_inputs = tf.reshape(cnn_inputs, (-1, self.max_word_length, self.char_embed_size, 1))
 
-            # _filter = tf.get_variable(
-            #     name="cnn_filter",
-            #     shape=[self.max_word_length, self.char_embed_size, 1, self.filter_size],
-            #     initializer=tf.contrib.layers.xavier_initializer(),
-            #     trainable=True
-            # )
-
-            conv = tf.layers.conv2d(cnn_inputs,
+            flat = tf.reshape(cnn_inputs, (-1, self.max_word_length, self.char_embed_size))
+            conv = tf.layers.conv1d(flat,
                                     filters=self.filter_size,
-                                    kernel_size=(3, self.char_embed_size),
-                                    padding='VALID',
+                                    kernel_size=3,
+                                    padding='valid',
                                     activation=tf.nn.relu,
                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
-            pool = tf.nn.max_pool(conv,
-                                  [1, self.max_word_length - 2, 1, 1],
-                                  [1, 1, 1, 1],
-                                  'VALID')
+            # [batch_size, max_seq_length, max_char_length, filters]
 
-            pool = tf.squeeze(pool, [1, 2])
+            pool = tf.reduce_max(conv, axis=1)  # [batch_size, max_seq_length, filters]
             pool = tf.reshape(pool, (-1, self.max_seq_length, self.filter_size))
 
         self.embedding_layer = tf.concat([self.word_embedding_layer, pool], axis=2)
+
+    def _add_elmo_embedding(self):
+        """
+        The Elmo embedding layer
+        """
+        embeddings_op = self.elmo_bilm(self.elmo_p)
+        self.elmo_emb = weight_layers('input', embeddings_op, l2_coef=0.0)['weighted_op']
+
+        self.elmo_emb = tc.layers.fully_connected(self.elmo_emb, num_outputs=self.hidden_size, activation_fn=None)
+
+        self.elmo_emb = tf.nn.dropout(self.elmo_emb, self.dropout)
+
+        if self.elmo_mode == 1:
+            # concat word emb and elmo emb
+            self.embedding_layer = tf.concat([self.embedding_layer, self.elmo_emb], 2)
+        else:
+            # Default: only use Elmo
+            self.embedding_layer = self.elmo_emb
 
     def _add_rnn(self):
         def rnn_cell(gru=True):
@@ -225,6 +235,7 @@ class BiLSTMCNNCRFModel(object):
         self._add_placeholders()
         self._add_embedding()
         self._add_cnn()
+        self._add_elmo_embedding()
         self._add_rnn()
         self._add_crf()
         self._add_train_op()
@@ -236,21 +247,30 @@ class BiLSTMCNNCRFModel(object):
             self.labels: labels,
             self.dropout: self._dropout
         }
+
+        if self.elmo_bilm and self.elmo_batcher:
+            input_feed[self.elmo_p] = self.elmo_batcher.batch_sentences([[self.vocab[int(i)]] for i in s] for s in tokens)
+
         output_feed = [
-            self._train_op,
-            self.loss
-        ]
+                self._train_op,
+                self.loss
+            ]
 
         _, loss = sess.run(output_feed, input_feed)
         return loss
 
     def test(self, sess, tokens, chars):
+        input_feed = {
+            self.tokens: tokens,
+            self.chars: chars,
+            self.dropout: self._dropout
+        }
+
+        if self.elmo_bilm and self.elmo_batcher:
+            input_feed[self.elmo_p] = self.elmo_batcher.batch_sentences([[self.vocab[int(i)]] for i in s] for s in tokens)
+
         viterbi_sequences, lengths = sess.run(
-            [self.viterbi_sequence, self.length], {
-                self.tokens: tokens,
-                self.chars: chars,
-                self.dropout: 1.0
-            }
+            [self.viterbi_sequence, self.length], input_feed
         )
 
         pred = []
