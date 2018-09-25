@@ -40,7 +40,7 @@ def parse_conll2003():
             else:
                 data = row.split(' ')
                 token = data[0]
-                chars = [ch for ch in token]
+                chars = [ch for ch in token]  # Character一定要保留大小写
 
                 token = re.sub('\d', '0', token.lower())
                 label = data[-1].strip()
