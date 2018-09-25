@@ -214,10 +214,9 @@ class BiLSTMCNNCRFModel(object):
                                             self.global_step,
                                             878,
                                             0.05)
-        optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-        # optimizer = tf.train.AdamOptimizer(0.001)
-
         self.lr = learning_rate
+        # optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+        optimizer = tf.train.AdamOptimizer(0.001)
 
         params = tf.trainable_variables()
         gradients = tf.gradients(self.loss, params)

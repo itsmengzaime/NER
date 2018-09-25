@@ -6,6 +6,7 @@ import numpy as np
 
 max_word_len = 20
 
+
 def parse_conll2003():
     train_file = open('data/train.txt')
     val_file = open('data/valid.txt')
@@ -38,9 +39,10 @@ def parse_conll2003():
                     sl = []
             else:
                 data = row.split(' ')
-                token = data[0].strip().lower()
-                token = re.sub('\d', '0', token)
+                token = data[0]
                 chars = [ch for ch in token]
+
+                token = re.sub('\d', '0', token.lower())
                 label = data[-1].strip()
 
                 if len(chars) > max_word_len:
@@ -81,8 +83,8 @@ def parse_conll2003():
 
     with open('dev/conll.pkl', 'wb') as fp:
         pickle.dump((dump[0], dump[1], dump[2],
-            {
-            'words2idx': w2idx,
-            'chars2idx': ch2idx,
-            'labels2idx': la2idx
-            }), fp)
+                     {
+                         'words2idx': w2idx,
+                         'chars2idx': ch2idx,
+                         'labels2idx': la2idx
+                     }), fp)
