@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+from gensim.models import KeyedVectors
 
 import tensorflow as tf
 from tensorflow.python.eager import context
@@ -10,6 +11,39 @@ from tensorflow.python.framework import ops
 from tensorflow.python.ops import math_ops
 
 from utils.conlleval import evaluate_conll_file
+
+
+def load_pretrained_senna():
+    vocab = []
+    with open('resources/pretrained/senna/vocab.txt') as fp:
+        for row in fp:
+            vocab.append(row.strip())
+    emb = np.genfromtxt('resources/pretrained/senna/emb.txt', delimiter=' ', dtype=np.float)
+
+    return vocab, emb
+
+
+def load_pretrained_glove():
+    model = KeyedVectors.load_word2vec_format('resources/pretrained/glove/glove.6B.100d.txt')
+
+    vocab = list(model.vocab.keys())
+    emb = model.vectors
+
+    return vocab, emb
+
+
+def load_train_vocab():
+    word_vocab = []
+    with open('dev/train.word.vocab') as fp:
+        for row in fp:
+            word_vocab.append(row.strip())
+
+    char_vocab = []
+    with open('dev/train.char.vocab') as fp:
+        for row in fp:
+            char_vocab.append(row.strip())
+
+    return word_vocab, char_vocab
 
 
 def decay_learning_rate(learning_rate,

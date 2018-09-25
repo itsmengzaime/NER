@@ -2,13 +2,12 @@
 
 import numpy as np
 import tensorflow as tf
-from gensim.models import KeyedVectors
 
-from utils.utils import viterbi_decode_topk, decay_learning_rate
+from utils.utils import viterbi_decode_topk, decay_learning_rate, load_train_vocab, load_pretrained_glove
 
 
 class BiLSTMCNNCRFModel(object):
-    """Bi-LSTM + CRF implemented by Tensorflow
+    """Bi-LSTM + CNN + CRF implemented by Tensorflow
 
     Attributes:
         num_classes: number of classes
@@ -41,36 +40,6 @@ class BiLSTMCNNCRFModel(object):
 
         self._build_graph()
 
-    def _load_pretrained_senna(self):
-        vocab = []
-        with open('senna/pretrained.vocab') as fp:
-            for row in fp:
-                vocab.append(row.strip())
-        emb = np.genfromtxt('senna/pretrained.emb', delimiter=' ', dtype=np.float)
-
-        return vocab, emb
-
-    def _load_pretrained_glove(self):
-        model = KeyedVectors.load_word2vec_format('glove/glove.6B.100d.txt')
-
-        vocab = list(model.vocab.keys())
-        emb = model.vectors
-
-        return vocab, emb
-
-    def _load_train_vocab(self):
-        word_vocab = []
-        with open('dev/train.word.vocab') as fp:
-            for row in fp:
-                word_vocab.append(row.strip())
-
-        char_vocab = []
-        with open('dev/train.char.vocab') as fp:
-            for row in fp:
-                char_vocab.append(row.strip())
-
-        return word_vocab, char_vocab
-
     def _add_placeholders(self):
         self.tokens = tf.placeholder(tf.string, [None, self.max_seq_length])
         self.chars = tf.placeholder(tf.string, [None, self.max_seq_length, self.max_word_length])
@@ -80,10 +49,10 @@ class BiLSTMCNNCRFModel(object):
 
     def _add_embedding(self):
         with tf.variable_scope('embedding'):
-            train_word_vocab, train_char_vocab = self._load_train_vocab()
+            train_word_vocab, train_char_vocab = load_train_vocab()
             if self.pre_embedding:
                 # pretrained_vocab, pretrained_embs = self._load_pretrained_senna()
-                pretrained_vocab, pretrained_embs = self._load_pretrained_glove()
+                pretrained_vocab, pretrained_embs = load_pretrained_glove()
 
                 only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
                 vocab = pretrained_vocab + only_in_train

@@ -11,7 +11,7 @@ from utils.parser import parse_conll2003
 from utils.conlleval import evaluate
 from utils.checkmate import BestCheckpointSaver, best_checkpoint
 
-from model.BiLSTMCNNCRF import BiLSTMCNNCRFModel
+from model.Elmo import ElmoModel
 
 from bilm import Batcher, BidirectionalLanguageModel
 
@@ -36,8 +36,10 @@ val_x, val_chars, val_la = val_set
 test_x, test_chars, test_la = test_set
 
 print('Load elmo...')
-elmo_batcher = Batcher('dev/train.word.vocab', 20)
-ekmo_bilm = BidirectionalLanguageModel('', '', trainable=False)
+elmo_batcher = Batcher('dev/vocab.txt', 50)
+elmo_bilm = BidirectionalLanguageModel('resources/elmo/elmo_2x4096_512_2048cnn_2xhighway_5.5B_options.json',
+                                       'resources/elmo/elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5',
+                                       trainable=False)
 
 print('Load model...')
 
@@ -51,17 +53,21 @@ max_word_length = max(
     max([len(ssc) for sc in test_chars for ssc in sc])
 )
 
-model = BiLSTMCNNCRFModel(
+model = ElmoModel(
     True,
-    50,   # Word embedding size
+    100,  # Word embedding size
     30,   # Character embedding size
-    200,  # LSTM state size
-    30,   # Filter size
+    100,  # LSTM state size
+    30,   # Filter num
+    3,    # Filter size
     num_classes,
     max_seq_length,
     max_word_length,
-    0.001,
-    0.5)
+    0.015,
+    0.5,
+    elmo_bilm,
+    1,    # elmo_mode
+    elmo_batcher)
 
 print('Start training...')
 print('Train size = %d' % len(train_x))

@@ -1,8 +1,10 @@
-# conding: utf-8
+# coding: utf-8
 
 import re
 import pickle
 import numpy as np
+
+from utils.utils import load_pretrained_glove
 
 max_word_len = 20
 
@@ -67,6 +69,19 @@ def parse_conll2003():
     with open('dev/train.word.vocab', 'w') as fp:
         for idx, word in enumerate(sorted(word_set)):
             w2idx[word] = idx
+            fp.write(word + '\n')
+
+    with open('dev/vocab.txt', 'w', encoding='gb18030') as fp:
+        train_word_vocab = sorted(word_set)
+        pretrained_vocab, _ = load_pretrained_glove()
+
+        only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
+        vocab = pretrained_vocab + only_in_train
+
+        vocab.insert(0, '<S>')
+        vocab.insert(1, '</S>')
+
+        for word in vocab:
             fp.write(word + '\n')
 
     with open('dev/train.char.vocab', 'w') as fp:

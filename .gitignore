@@ -1,11 +1,10 @@
 checkpoints/
 dev/
 data/
-senna/
 logs/
 eval/
 bilm/
-glove/
+resources/
 
 ### Python template
 # Byte-compiled / optimized / DLL files

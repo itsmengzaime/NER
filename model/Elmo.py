@@ -4,12 +4,12 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.contrib as tc
 
-from utils.utils import viterbi_decode_topk
-from bilm import BidirectionalLanguageModel, weight_layers
+from utils.utils import viterbi_decode_topk, decay_learning_rate, load_train_vocab, load_pretrained_glove
+from bilm import weight_layers
 
 
-class BiLSTMCNNCRFModel(object):
-    """Bi-LSTM + CRF implemented by Tensorflow
+class ElmoModel(object):
+    """Bi-LSTM + ElMo + CNN + CRF implemented by Tensorflow
 
     Attributes:
         num_classes: number of classes
@@ -21,6 +21,7 @@ class BiLSTMCNNCRFModel(object):
                  word_embed_size: int,
                  char_embed_size: int,
                  hidden_size: int,
+                 filter_num: int,
                  filter_size: int,
                  num_classes: int,
                  max_seq_length: int,
@@ -34,6 +35,7 @@ class BiLSTMCNNCRFModel(object):
         self.word_embed_size = word_embed_size
         self.char_embed_size = char_embed_size
         self.hidden_size = hidden_size
+        self.filter_num = filter_num
         self.filter_size = filter_size
         self.num_classes = num_classes
         self.max_seq_length = max_seq_length
@@ -47,28 +49,6 @@ class BiLSTMCNNCRFModel(object):
 
         self._build_graph()
 
-    def _load_pretrained_senna(self):
-        vocab = []
-        with open('senna/pretrained.vocab') as fp:
-            for row in fp:
-                vocab.append(row.strip())
-        emb = np.genfromtxt('senna/pretrained.emb', delimiter=' ', dtype=np.float)
-
-        return vocab, emb
-
-    def _load_train_vocab(self):
-        word_vocab = []
-        with open('dev/train.word.vocab') as fp:
-            for row in fp:
-                word_vocab.append(row.strip())
-
-        char_vocab = []
-        with open('dev/train.char.vocab') as fp:
-            for row in fp:
-                char_vocab.append(row.strip())
-
-        return word_vocab, char_vocab
-
     def _add_placeholders(self):
         self.tokens = tf.placeholder(tf.string, [None, self.max_seq_length])
         self.chars = tf.placeholder(tf.string, [None, self.max_seq_length, self.max_word_length])
@@ -81,9 +61,10 @@ class BiLSTMCNNCRFModel(object):
 
     def _add_embedding(self):
         with tf.variable_scope('embedding'):
-            train_word_vocab, train_char_vocab = self._load_train_vocab()
+            train_word_vocab, train_char_vocab = load_train_vocab()
             if self.pre_embedding:
-                pretrained_vocab, pretrained_embs = self._load_pretrained_senna()
+                # pretrained_vocab, pretrained_embs = self._load_pretrained_senna()
+                pretrained_vocab, pretrained_embs = load_pretrained_glove()
 
                 only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
                 vocab = pretrained_vocab + only_in_train
@@ -141,22 +122,29 @@ class BiLSTMCNNCRFModel(object):
 
     def _add_cnn(self):
         with tf.variable_scope('cnn'):
+            cnn_inputs = tf.reshape(self.char_embedding_layer, (-1, self.max_word_length, self.char_embed_size, 1))
+
             # A dropout layer is applied before character embeddings are input to CNN
-            cnn_inputs = tf.nn.dropout(self.char_embedding_layer, keep_prob=self.dropout)
+            cnn_inputs = tf.nn.dropout(cnn_inputs, keep_prob=self.dropout)
 
-            flat = tf.reshape(cnn_inputs, (-1, self.max_word_length, self.char_embed_size))
-            conv = tf.layers.conv1d(flat,
-                                    filters=self.filter_size,
-                                    kernel_size=3,
-                                    padding='valid',
-                                    activation=tf.nn.relu,
-                                    kernel_initializer=tf.contrib.layers.xavier_initializer())
-            # [batch_size, max_seq_length, max_char_length, filters]
+            filter_shape = [self.filter_size, self.char_embed_size, 1, self.filter_num]
+            w = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="cnn_w")
+            b = tf.Variable(tf.constant(0.1, shape=[self.filter_num]), name="cnn_b")
+            conv = tf.nn.conv2d(
+                cnn_inputs,
+                w,
+                strides=[1, 1, 1, 1],
+                padding="VALID")
+            h = tf.nn.relu(tf.nn.bias_add(conv, b), name="cnn_relu")
+            pool = tf.nn.max_pool(
+                h,
+                ksize=[1, self.max_word_length - self.filter_size + 1, 1, 1],
+                strides=[1, 1, 1, 1],
+                padding='VALID')
 
-            pool = tf.reduce_max(conv, axis=1)  # [batch_size, max_seq_length, filters]
-            pool = tf.reshape(pool, (-1, self.max_seq_length, self.filter_size))
+            pool = tf.reshape(pool, (-1, self.max_seq_length, self.filter_num))
 
-        self.embedding_layer = tf.concat([self.word_embedding_layer, pool], axis=2)
+        self.embedding_layer = tf.concat([self.word_embedding_layer, pool], 2)
 
     def _add_elmo_embedding(self):
         """
@@ -198,7 +186,7 @@ class BiLSTMCNNCRFModel(object):
                 dtype=tf.float32,
                 sequence_length=self.length
             )
-            self.layer_output = tf.concat(axis=2, values=outputs)
+            self.layer_output = tf.concat(values=outputs, axis=2)
 
     def _add_crf(self):
         flattened_output = tf.reshape(self.layer_output, [-1, self.hidden_size * 2])
@@ -218,10 +206,17 @@ class BiLSTMCNNCRFModel(object):
         self.viterbi_sequence, _ = tf.contrib.crf.crf_decode(
             self.unary_potentials, self.trans_params, tf.cast(self.length, tf.int32)
         )
-        self.loss = tf.reduce_sum(-self.ll)
+        self.loss = -tf.reduce_sum(self.ll)
 
     def _add_train_op(self):
-        optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        learning_rate = decay_learning_rate(self.learning_rate,
+                                            self.global_step,
+                                            878,
+                                            0.05)
+        self.lr = learning_rate
+        # optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+        optimizer = tf.train.AdamOptimizer(0.001)
+
         params = tf.trainable_variables()
         gradients = tf.gradients(self.loss, params)
         clipped_gradients, norm = tf.clip_by_global_norm(gradients, 5.0)
@@ -235,7 +230,10 @@ class BiLSTMCNNCRFModel(object):
         self._add_placeholders()
         self._add_embedding()
         self._add_cnn()
+
+        # elmo
         self._add_elmo_embedding()
+
         self._add_rnn()
         self._add_crf()
         self._add_train_op()
@@ -249,28 +247,33 @@ class BiLSTMCNNCRFModel(object):
         }
 
         if self.elmo_bilm and self.elmo_batcher:
-            input_feed[self.elmo_p] = self.elmo_batcher.batch_sentences([[self.vocab[int(i)]] for i in s] for s in tokens)
+            input_feed[self.elmo_p] = self.elmo_batcher.batch_sentences([sx.tolist() for sx in tokens])
 
         output_feed = [
-                self._train_op,
-                self.loss
-            ]
+            self.lr,
+            self._train_op,
+            self.loss
+        ]
 
-        _, loss = sess.run(output_feed, input_feed)
+        lr, _, loss = sess.run(output_feed, input_feed)
+
+        # print("Learning Rate =", lr)
+
         return loss
 
     def test(self, sess, tokens, chars):
         input_feed = {
-            self.tokens: tokens,
-            self.chars: chars,
-            self.dropout: self._dropout
-        }
+                self.tokens: tokens,
+                self.chars: chars,
+                self.dropout: 1.0
+            }
 
         if self.elmo_bilm and self.elmo_batcher:
-            input_feed[self.elmo_p] = self.elmo_batcher.batch_sentences([[self.vocab[int(i)]] for i in s] for s in tokens)
+            input_feed[self.elmo_p] = self.elmo_batcher.batch_sentences([sx.tolist() for sx in tokens])
 
         viterbi_sequences, lengths = sess.run(
-            [self.viterbi_sequence, self.length], input_feed
+            [self.viterbi_sequence, self.length],
+            input_feed
         )
 
         pred = []
