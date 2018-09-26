@@ -153,7 +153,7 @@ class ElmoModel(object):
         embeddings_op = self.elmo_bilm(self.elmo_p)
         self.elmo_emb = weight_layers('input', embeddings_op, l2_coef=0.0)['weighted_op']
 
-        self.elmo_emb = tc.layers.fully_connected(self.elmo_emb, num_outputs=self.hidden_size, activation_fn=None)
+        # self.elmo_emb = tc.layers.fully_connected(self.elmo_emb, num_outputs=self.hidden_size, activation_fn=None)
 
         self.elmo_emb = tf.nn.dropout(self.elmo_emb, self.dropout)
 
@@ -165,12 +165,12 @@ class ElmoModel(object):
             self.embedding_layer = self.elmo_emb
 
     def _add_rnn(self):
-        def rnn_cell(gru=True):
+        def rnn_cell(hidden_size=self.hidden_size, gru=True):
             if gru:
-                cell = tf.contrib.rnn.GRUCell(self.hidden_size,
+                cell = tf.contrib.rnn.GRUCell(hidden_size,
                                               kernel_initializer=tf.contrib.layers.xavier_initializer())
             else:
-                cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)
+                cell = tf.contrib.rnn.BasicLSTMCell(hidden_size)
             cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=self.dropout)
             return cell
 
@@ -178,8 +178,8 @@ class ElmoModel(object):
         rnn_inputs = tf.nn.dropout(self.embedding_layer, keep_prob=self.dropout)
 
         with tf.variable_scope('recurrent'):
-            fw_cells = [rnn_cell(False) for _ in range(2)]
-            bw_cells = [rnn_cell(False) for _ in range(2)]
+            fw_cells = [rnn_cell(200), rnn_cell(100)]
+            bw_cells = [rnn_cell(200), rnn_cell(100)]
             outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
                 fw_cells, bw_cells,
                 rnn_inputs,
