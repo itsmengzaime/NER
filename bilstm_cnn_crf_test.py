@@ -10,6 +10,7 @@ import tensorflow as tf
 from utils.feeder.LSTMCNNCRFeeder import LSTMCNNCRFeeder
 from utils.parser import parse_conll2003
 from utils.checkmate import BestCheckpointSaver, best_checkpoint
+from utils.conlleval import evaluate
 
 from model.BiLSTMCNNCRF import BiLSTMCNNCRFModel
 
@@ -47,14 +48,15 @@ max_word_length = max(
 
 model = BiLSTMCNNCRFModel(
     True,
-    50,   # Word embedding size
-    30,   # Character embedding size
-    200,  # LSTM state size
-    30,   # Filter size
+    50,  # Word embedding size
+    16,  # Character embedding size
+    100,  # LSTM state size
+    128,  # Filter num
+    3,  # Filter size
     num_classes,
     max_seq_length,
     max_word_length,
-    0.001,
+    0.015,
     0.5)
 
 print('Start training...')
@@ -93,23 +95,8 @@ train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, m
 val_feeder = LSTMCNNCRFeeder(val_x, val_chars, val_la, max_seq_length, max_word_length, 16)
 test_feeder = LSTMCNNCRFeeder(test_x, test_chars, test_la, max_seq_length, max_word_length, 16)
 
-'''
 preds = []
-for step in range(val_feeder.step_per_epoch):
-    tokens, chars, labels = val_feeder.feed()
-    pred = model.test(sess, tokens, chars)
-    preds.extend(pred)
-true_seqs = [idx2la[la] for sl in val_la for la in sl ]
-pred_seqs = [idx2la[la] for sl in preds for la in sl ]
-ll = min(len(true_seqs), len(pred_seqs))
-_, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
-
-val_feeder.next_epoch(False)
-
-print("Val F1: %f" % f1)
-
-preds = []
-for step in range(test_feeder.step_per_epoch):
+for step in tqdm(range(test_feeder.step_per_epoch)):
     tokens, chars, labels = test_feeder.feed()
     pred = model.test(sess, tokens, chars)
     preds.extend(pred)
@@ -121,10 +108,9 @@ _, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
 test_feeder.next_epoch(False)
 
 print("Test F1: %f" % f1)
+
 '''
-
 total = len(test_la)
-
 with open('dev/test.format', 'w') as fp:
     for step in tqdm(range(test_feeder.step_per_epoch)):
         tokens, chars, labels = test_feeder.feed()
@@ -137,4 +123,26 @@ with open('dev/test.format', 'w') as fp:
             for tup in zip(st, sl, sp):
                 fp.write(' '.join(tup) + '\n')
             fp.write('\n')
+'''
 
+
+def dump_topK(prefix, feeder, topK):
+    total = len(test_la)
+
+    with open('dev/predict.%s' % prefix, 'w') as fp:
+        for i in range(total):
+            tokens, chars, labels = feeder.feed()
+            pred = model.test(sess, tokens, chars)
+
+            true_seqs = [[idx2la[la] for la in sl] for sl in labels]
+            pred_seqs = [[idx2la[la] for la in sl] for sl in pred]
+
+            for st, sl, sp in zip(tokens, true_seqs, pred_seqs):
+                for tup in zip(st, sl, sp):
+                    fp.write(' '.join(tup) + '\n')
+                fp.write('\n')
+
+
+# train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 16)
+
+dump_topK('test', test_feeder, 3)

@@ -239,13 +239,13 @@ class BiLSTMCNNCRFModel(object):
 
         return pred
 
-    def decode(self, sess, tokens, chars, length, topK=5):
+    def decode(self, sess, tokens, chars, topK=5):
         """
         score: [seq_len, num_tags]
         transition_params: [num_tags, num_tags]
         """
 
-        score, trans_params = sess.run([self.unary_potentials, self.trans_params], {
+        length, score, trans_params = sess.run([self.length, self.unary_potentials, self.trans_params], {
             self.tokens: tokens,
             self.chars: chars,
             self.dropout: 1.0
