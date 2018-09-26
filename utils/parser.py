@@ -4,7 +4,7 @@ import re
 import pickle
 import numpy as np
 
-from utils.utils import load_pretrained_glove
+from utils.utils import load_pretrained_glove, load_pretrained_senna
 
 max_word_len = 20
 
@@ -73,7 +73,7 @@ def parse_conll2003():
 
     with open('dev/vocab.txt', 'w', encoding='gb18030') as fp:
         train_word_vocab = sorted(word_set)
-        pretrained_vocab, _ = load_pretrained_glove()
+        pretrained_vocab, _ = load_pretrained_senna()
 
         only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
         vocab = pretrained_vocab + only_in_train

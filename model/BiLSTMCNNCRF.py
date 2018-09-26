@@ -3,7 +3,8 @@
 import numpy as np
 import tensorflow as tf
 
-from utils.utils import viterbi_decode_topk, decay_learning_rate, load_train_vocab, load_pretrained_glove
+from utils.utils import viterbi_decode_topk, decay_learning_rate, \
+    load_train_vocab, load_pretrained_glove, load_pretrained_senna
 
 
 class BiLSTMCNNCRFModel(object):
@@ -51,8 +52,7 @@ class BiLSTMCNNCRFModel(object):
         with tf.variable_scope('embedding'):
             train_word_vocab, train_char_vocab = load_train_vocab()
             if self.pre_embedding:
-                # pretrained_vocab, pretrained_embs = self._load_pretrained_senna()
-                pretrained_vocab, pretrained_embs = load_pretrained_glove()
+                pretrained_vocab, pretrained_embs = load_pretrained_senna()
 
                 only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
                 vocab = pretrained_vocab + only_in_train
@@ -135,12 +135,12 @@ class BiLSTMCNNCRFModel(object):
         self.embedding_layer = tf.concat([self.word_embedding_layer, pool], 2)
 
     def _add_rnn(self):
-        def rnn_cell(gru=True):
+        def rnn_cell(hidden_size=self.hidden_size, gru=True):
             if gru:
-                cell = tf.contrib.rnn.GRUCell(self.hidden_size,
+                cell = tf.contrib.rnn.GRUCell(hidden_size,
                                               kernel_initializer=tf.contrib.layers.xavier_initializer())
             else:
-                cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)
+                cell = tf.contrib.rnn.BasicLSTMCell(hidden_size)
             cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=self.dropout)
             return cell
 
@@ -148,8 +148,8 @@ class BiLSTMCNNCRFModel(object):
         rnn_inputs = tf.nn.dropout(self.embedding_layer, keep_prob=self.dropout)
 
         with tf.variable_scope('recurrent'):
-            fw_cells = [rnn_cell(False) for _ in range(1)]
-            bw_cells = [rnn_cell(False) for _ in range(1)]
+            fw_cells = [rnn_cell(200), rnn_cell(100)]
+            bw_cells = [rnn_cell(200), rnn_cell(100)]
             outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
                 fw_cells, bw_cells,
                 rnn_inputs,

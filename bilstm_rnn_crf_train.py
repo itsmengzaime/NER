@@ -1,17 +1,16 @@
 # coding: utf-8
 
+import logging
 import os
 import pickle
-import logging
 
 import tensorflow as tf
 
+from model.BiLSTMCNNCRF import BiLSTMCNNCRFModel
+from utils.checkmate import BestCheckpointSaver
+from utils.conlleval import evaluate
 from utils.feeder.LSTMCNNCRFeeder import LSTMCNNCRFeeder
 from utils.parser import parse_conll2003
-from utils.conlleval import evaluate
-from utils.checkmate import BestCheckpointSaver, best_checkpoint
-
-from model.BiLSTMCNNCRF import BiLSTMCNNCRFModel
 
 
 def conll2003():
@@ -47,10 +46,10 @@ max_word_length = max(
 
 model = BiLSTMCNNCRFModel(
     True,
-    50,   # Word embedding size
-    16,   # Character embedding size
+    100,  # Word embedding size
+    30,   # Character embedding size
     100,  # LSTM state size
-    128,  # Filter num
+    30,   # Filter num
     3,    # Filter size
     num_classes,
     max_seq_length,
@@ -86,9 +85,17 @@ logging.basicConfig(level=logging.DEBUG,
 latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir='checkpoints')
 if latest_checkpoint:
     saver.restore(sess, latest_checkpoint)
+
+# best_checkpoint = best_checkpoint('checkpoints/best/', True)
+# if best_checkpoint:
+#     saver.restore(sess, best_checkpoint)
 else:
     sess.run(tf.global_variables_initializer())
 sess.run(tf.tables_initializer())
+
+# feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 10)
+# tokens, chars, labels = feeder.feed()
+# length = sess.run(model.length, {model.tokens: tokens, model.chars: chars})
 
 train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 16)
 val_feeder = LSTMCNNCRFeeder(val_x, val_chars, val_la, max_seq_length, max_word_length, 16)
