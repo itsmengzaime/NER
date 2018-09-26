@@ -178,8 +178,8 @@ class ElmoModel(object):
         rnn_inputs = tf.nn.dropout(self.embedding_layer, keep_prob=self.dropout)
 
         with tf.variable_scope('recurrent'):
-            fw_cells = [rnn_cell(False) for _ in range(1)]
-            bw_cells = [rnn_cell(False) for _ in range(1)]
+            fw_cells = [rnn_cell(False) for _ in range(2)]
+            bw_cells = [rnn_cell(False) for _ in range(2)]
             outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
                 fw_cells, bw_cells,
                 rnn_inputs,

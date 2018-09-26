@@ -2,9 +2,9 @@
 
 import os
 import pickle
-import logging
 
 from tqdm import tqdm
+import numpy as np
 import tensorflow as tf
 
 from utils.feeder.LSTMCNNCRFeeder import LSTMCNNCRFeeder
@@ -79,17 +79,9 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 sess = tf.Session(config=config)
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(message)s',
-                    datefmt='%m-%d %H:%M',
-                    handlers=[logging.FileHandler('logs/train.log'), logging.StreamHandler()])
-
 best_checkpoint = best_checkpoint('checkpoints/best/', True)
-if best_checkpoint:
-    saver.restore(sess, best_checkpoint)
-else:
-    sess.run(tf.global_variables_initializer())
 sess.run(tf.tables_initializer())
+saver.restore(sess, best_checkpoint)
 
 train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 16)
 val_feeder = LSTMCNNCRFeeder(val_x, val_chars, val_la, max_seq_length, max_word_length, 16)
@@ -107,7 +99,7 @@ _, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
 
 test_feeder.next_epoch(False)
 
-print("Test F1: %f" % f1)
+print("\nTest F1: %f" % f1)
 
 '''
 total = len(test_la)
@@ -127,22 +119,25 @@ with open('dev/test.format', 'w') as fp:
 
 
 def dump_topK(prefix, feeder, topK):
-    total = len(test_la)
-
     with open('dev/predict.%s' % prefix, 'w') as fp:
-        for i in range(total):
+        for _ in tqdm(range(feeder.step_per_epoch)):
             tokens, chars, labels = feeder.feed()
-            pred = model.test(sess, tokens, chars)
 
-            true_seqs = [[idx2la[la] for la in sl] for sl in labels]
-            pred_seqs = [[idx2la[la] for la in sl] for sl in pred]
+            for i in range(16):
+                preds, scores = model.decode(sess, np.expand_dims(tokens[i], 0), np.expand_dims(chars[i], 0), topK)
 
-            for st, sl, sp in zip(tokens, true_seqs, pred_seqs):
-                for tup in zip(st, sl, sp):
-                    fp.write(' '.join(tup) + '\n')
+                length = len(preds[0])
+
+                st = tokens[0, :length].tolist()
+                sl = [idx2la[la] for la in labels[0, :length].tolist()]
+
+                preds = [[idx2la[la] for la in pred] for pred in preds]
+
+                for all in zip(*[st, sl, *preds]):
+                    fp.write(' '.join(all) + '\n')
                 fp.write('\n')
 
 
-# train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 16)
-
+dump_topK('train', train_feeder, 3)
+dump_topK('dev', val_feeder, 3)
 dump_topK('test', test_feeder, 3)

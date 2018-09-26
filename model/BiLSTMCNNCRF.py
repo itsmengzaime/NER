@@ -250,6 +250,7 @@ class BiLSTMCNNCRFModel(object):
             self.chars: chars,
             self.dropout: 1.0
         })
+        length = length[0]
         score = np.squeeze(score, 0)
         score = score[:length, :]
 
@@ -267,7 +268,7 @@ class BiLSTMCNNCRFModel(object):
             topK
         )
 
-        for a, b in zip(viterbi_score, viterbi):
-            print("{:<20} {}".format(a, b))
+        # for a, b in zip(viterbi_score, viterbi):
+        #     print("{:<20} {}".format(a, b))
 
         return viterbi, viterbi_score
