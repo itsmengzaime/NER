@@ -42,14 +42,18 @@ def parse_conll2003():
             else:
                 data = row.split(' ')
                 token = data[0]
+                token = re.sub('\d', '0', token)
+
                 chars = [ch for ch in token]  # Character一定要保留大小写
 
-                token = re.sub('\d', '0', token.lower())
+                token = token.lower()  # 可选：是否全部转小写
+
                 label = data[-1].strip()
 
                 if len(chars) > max_word_len:
-                    half = max_word_len // 2
-                    chars = chars[:half] + chars[-(max_word_len - half):]
+                    # half = max_word_len // 2
+                    # chars = chars[:half] + chars[-(max_word_len - half):]
+                    chars = chars[:max_word_len]
 
                 sx.append(token)
                 sc.append(chars)
