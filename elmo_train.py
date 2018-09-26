@@ -58,7 +58,7 @@ model = ElmoModel(
     50,   # Word embedding size
     16,   # Character embedding size
     100,  # LSTM state size
-    128,   # Filter num
+    128,  # Filter num
     3,    # Filter size
     num_classes,
     max_seq_length,
