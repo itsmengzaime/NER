@@ -126,10 +126,10 @@ def dump_topK(prefix, feeder, topK):
             for i in range(min(16, tokens.shape[0])):
                 preds, scores = model.decode(sess, np.expand_dims(tokens[i], 0), np.expand_dims(chars[i], 0), topK)
 
-                length = len(preds[i])
+                length = len(preds[0])
 
-                st = tokens[0, :length].tolist()
-                sl = [idx2la[la] for la in labels[0, :length].tolist()]
+                st = tokens[i, :length].tolist()
+                sl = [idx2la[la] for la in labels[i, :length].tolist()]
 
                 preds = [[idx2la[la] for la in pred] for pred in preds]
 
