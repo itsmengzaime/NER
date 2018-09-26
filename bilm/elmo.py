@@ -1,6 +1,6 @@
-
 import tensorflow as tf
 import tensorflow.contrib as tc
+
 
 def weight_layers(name, bilm_ops, l2_coef=None,
                   use_top_only=False, do_layer_norm=False):
@@ -30,6 +30,7 @@ def weight_layers(name, bilm_ops, l2_coef=None,
             'regularization_op': op to compute regularization term
         }
     '''
+
     def _l2_regularizer(weights):
         if l2_coef is not None:
             return l2_coef * tf.reduce_sum(tf.square(weights))
@@ -54,8 +55,8 @@ def weight_layers(name, bilm_ops, l2_coef=None,
             x_masked = x * broadcast_mask
             N = tf.reduce_sum(mask_float) * lm_dim
             mean = tf.reduce_sum(x_masked) / N
-            variance = tf.reduce_sum(((x_masked - mean) * broadcast_mask)**2
-                                    ) / N
+            variance = tf.reduce_sum(((x_masked - mean) * broadcast_mask) ** 2
+                                     ) / N
             return tf.nn.batch_normalization(
                 x, mean, variance, None, None, 1E-12
             )
@@ -69,7 +70,7 @@ def weight_layers(name, bilm_ops, l2_coef=None,
         else:
             W = tf.get_variable(
                 '{}_ELMo_W'.format(name),
-                shape=(n_lm_layers, ),
+                shape=(n_lm_layers,),
                 initializer=tf.zeros_initializer,
                 regularizer=_l2_regularizer,
                 trainable=True,
@@ -81,7 +82,7 @@ def weight_layers(name, bilm_ops, l2_coef=None,
             )
             # split LM layers
             layers = tf.split(lm_embeddings, n_lm_layers, axis=1)
-    
+
             # compute the weighted, normalized LM activations
             pieces = []
             for w, t in zip(normed_weights, layers):
@@ -90,11 +91,11 @@ def weight_layers(name, bilm_ops, l2_coef=None,
                 else:
                     pieces.append(w * tf.squeeze(t, squeeze_dims=1))
             sum_pieces = tf.add_n(pieces)
-    
+
             # get the regularizer 
             reg = [
                 r for r in tf.get_collection(
-                                tf.GraphKeys.REGULARIZATION_LOSSES)
+                    tf.GraphKeys.REGULARIZATION_LOSSES)
                 if r.name.find('{}_ELMo_W/'.format(name)) >= 0
             ]
             if len(reg) != 1:
@@ -103,10 +104,11 @@ def weight_layers(name, bilm_ops, l2_coef=None,
         # scale the weighted sum by gamma
         gamma = tf.get_variable(
             '{}_ELMo_gamma'.format(name),
-            shape=(1, ),
-            initializer=tf.ones_initializer,
+            shape=(1,),
+            initializer=tf.constant_initializer(0.1),
+            # initializer=tf.ones_initializer,
             regularizer=None,
-            trainable=True,
+            trainable=False,
         )
         weighted_lm_layers = sum_pieces * gamma
 
@@ -114,8 +116,9 @@ def weight_layers(name, bilm_ops, l2_coef=None,
 
     return ret
 
+
 def weight_layers_q(name, bilm_ops, q_elmo_emb, l2_coef=None,
-                  use_top_only=False, do_layer_norm=False):
+                    use_top_only=False, do_layer_norm=False):
     '''
     After task-specific Elmo weighting, we use q_ops[
     Weight the layers of a biLM with question-dependent fashion trainable using NN to
@@ -143,6 +146,7 @@ def weight_layers_q(name, bilm_ops, q_elmo_emb, l2_coef=None,
             'regularization_op': op to compute regularization term
         }
     '''
+
     def _l2_regularizer(weights):
         if l2_coef is not None:
             return l2_coef * tf.reduce_sum(tf.square(weights))
@@ -158,7 +162,7 @@ def weight_layers_q(name, bilm_ops, q_elmo_emb, l2_coef=None,
     lm_dim = int(lm_embeddings.get_shape()[3])
 
     # Wilson: Use last hidden state of Elmo-Q to predict layer weights for passage: [Batch, 1, num lm layers]
-    q_layer_logits = tc.layers.fully_connected(q_elmo_emb[0:,-1,0:], num_outputs=n_lm_layers, activation_fn=None)
+    q_layer_logits = tc.layers.fully_connected(q_elmo_emb[0:, -1, 0:], num_outputs=n_lm_layers, activation_fn=None)
 
     with tf.control_dependencies([lm_embeddings, mask]):
         # Cast the mask and broadcast for layer use.
@@ -170,8 +174,8 @@ def weight_layers_q(name, bilm_ops, q_elmo_emb, l2_coef=None,
             x_masked = x * broadcast_mask
             N = tf.reduce_sum(mask_float) * lm_dim
             mean = tf.reduce_sum(x_masked) / N
-            variance = tf.reduce_sum(((x_masked - mean) * broadcast_mask)**2
-                                    ) / N
+            variance = tf.reduce_sum(((x_masked - mean) * broadcast_mask) ** 2
+                                     ) / N
             return tf.nn.batch_normalization(
                 x, mean, variance, None, None, 1E-12
             )
@@ -189,7 +193,7 @@ def weight_layers_q(name, bilm_ops, q_elmo_emb, l2_coef=None,
             # split LM layers
             layers = tf.split(lm_embeddings, n_lm_layers, axis=1)
             normed_weights = tf.split(q_layer_weights, n_lm_layers, axis=-1)
-    
+
             # compute the weighted, normalized LM activations
             pieces = []
             for w, t in zip(normed_weights, layers):
@@ -199,11 +203,11 @@ def weight_layers_q(name, bilm_ops, q_elmo_emb, l2_coef=None,
                 else:
                     pieces.append(ww * tf.squeeze(t, squeeze_dims=1))
             sum_pieces = tf.add_n(pieces)
-    
+
             # get the regularizer 
             reg = [
                 r for r in tf.get_collection(
-                                tf.GraphKeys.REGULARIZATION_LOSSES)
+                    tf.GraphKeys.REGULARIZATION_LOSSES)
                 if r.name.find('{}_ELMo_W/'.format(name)) >= 0
             ]
             if len(reg) != 1:
@@ -212,7 +216,7 @@ def weight_layers_q(name, bilm_ops, q_elmo_emb, l2_coef=None,
         # scale the weighted sum by gamma
         gamma = tf.get_variable(
             '{}_ELMoq_gamma'.format(name),
-            shape=(1, ),
+            shape=(1,),
             initializer=tf.ones_initializer,
             regularizer=None,
             trainable=True,
@@ -222,4 +226,3 @@ def weight_layers_q(name, bilm_ops, q_elmo_emb, l2_coef=None,
         ret = {'weighted_op': weighted_lm_layers, 'regularization_op': reg}
 
     return ret
-
