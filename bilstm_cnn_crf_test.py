@@ -123,10 +123,10 @@ def dump_topK(prefix, feeder, topK):
         for _ in tqdm(range(feeder.step_per_epoch)):
             tokens, chars, labels = feeder.feed()
 
-            for i in range(16):
+            for i in range(min(16, tokens.shape[0])):
                 preds, scores = model.decode(sess, np.expand_dims(tokens[i], 0), np.expand_dims(chars[i], 0), topK)
 
-                length = len(preds[0])
+                length = len(preds[i])
 
                 st = tokens[0, :length].tolist()
                 sl = [idx2la[la] for la in labels[0, :length].tolist()]
