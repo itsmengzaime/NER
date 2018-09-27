@@ -105,10 +105,10 @@ def weight_layers(name, bilm_ops, l2_coef=None,
         gamma = tf.get_variable(
             '{}_ELMo_gamma'.format(name),
             shape=(1,),
-            initializer=tf.constant_initializer(0.1),
-            # initializer=tf.ones_initializer,
+            # initializer=tf.constant_initializer(0.1),
+            initializer=tf.ones_initializer,
             regularizer=None,
-            trainable=False,
+            trainable=True,
         )
         weighted_lm_layers = sum_pieces * gamma
 

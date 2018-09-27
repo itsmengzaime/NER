@@ -64,8 +64,8 @@ class ElmoModel(object):
         with tf.variable_scope('embedding'):
             train_word_vocab, train_char_vocab = load_train_vocab()
             if self.pre_embedding:
-                pretrained_vocab, pretrained_embs = load_pretrained_senna()
-                # pretrained_vocab, pretrained_embs = load_pretrained_glove()
+                # pretrained_vocab, pretrained_embs = load_pretrained_senna()
+                pretrained_vocab, pretrained_embs = load_pretrained_glove()
 
                 only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
                 vocab = pretrained_vocab + only_in_train

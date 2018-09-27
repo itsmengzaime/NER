@@ -38,8 +38,7 @@ test_x, test_chars, test_la = test_set
 print('Load elmo...')
 elmo_batcher = Batcher('dev/vocab.txt', 50)
 elmo_bilm = BidirectionalLanguageModel('resources/elmo/elmo_2x4096_512_2048cnn_2xhighway_5.5B_options.json',
-                                       'resources/elmo/elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5',
-                                       trainable=False)
+                                       'resources/elmo/elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5')
 
 print('Load model...')
 
