@@ -58,6 +58,7 @@ class ElmoModel(object):
 
         # elmo
         self.elmo_p = tf.placeholder(tf.int32, [None, None, None])
+        self.elmo_padded_emb = tf.placeholder(tf.float32, [None, self.max_seq_length, 1024])
 
     def _add_embedding(self):
         with tf.variable_scope('embedding'):
@@ -166,7 +167,8 @@ class ElmoModel(object):
 
         if self.elmo_mode == 1:
             # concat word emb and elmo emb
-            self.embedding_layer = tf.concat([self.embedding_layer, self.elmo_emb], 2)
+            # self.embedding_layer = tf.concat([self.embedding_layer, self.elmo_emb], 2)
+            self.embedding_layer = tf.concat([self.embedding_layer, self.elmo_padded_emb], 2)
         else:
             # Default: only use Elmo
             self.embedding_layer = self.elmo_emb
@@ -254,7 +256,13 @@ class ElmoModel(object):
         }
 
         if self.elmo_bilm and self.elmo_batcher:
-            input_feed[self.elmo_p] = self.elmo_batcher.batch_sentences([sx.tolist() for sx in tokens])
+            sub_tokens = [[token for token in sx if token != '<PAD>'] for sx in tokens]
+            token_ids = self.elmo_batcher.batch_sentences(sub_tokens)
+            elmo_result = sess.run(self.elmo_emb, {self.elmo_p: token_ids})
+
+            elmo_padded_emb = np.pad(elmo_result, ((0, 0), (0, tokens.shape[1] - elmo_result.shape[1]), (0, 0)), 'constant', constant_values=0)
+
+            input_feed[self.elmo_padded_emb] = elmo_padded_emb
 
         output_feed = [
             self.lr,
@@ -276,7 +284,13 @@ class ElmoModel(object):
             }
 
         if self.elmo_bilm and self.elmo_batcher:
-            input_feed[self.elmo_p] = self.elmo_batcher.batch_sentences([sx.tolist() for sx in tokens])
+            sub_tokens = [[token for token in sx if token != '<PAD>'] for sx in tokens]
+            token_ids = self.elmo_batcher.batch_sentences(sub_tokens)
+            elmo_result = sess.run(self.elmo_emb, {self.elmo_p: token_ids})
+
+            elmo_padded_emb = np.pad(elmo_result, ((0, 0), (0, tokens.shape[1] - elmo_result.shape[1]), (0, 0)), 'constant', constant_values=0)
+
+            input_feed[self.elmo_padded_emb] = elmo_padded_emb
 
         viterbi_sequences, lengths = sess.run(
             [self.viterbi_sequence, self.length],
