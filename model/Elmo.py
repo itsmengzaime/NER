@@ -18,17 +18,17 @@ class ElmoModel(object):
         learning_rate: learning rate
     """
 
-    def __init__(self, pre_embedding: bool,
-                 word_embed_size: int,
-                 char_embed_size: int,
-                 hidden_size: int,
-                 filter_num: int,
-                 filter_size: int,
-                 num_classes: int,
-                 max_seq_length: int,
-                 max_word_length: int,
-                 learning_rate: float,
-                 dropout: float,
+    def __init__(self, pre_embedding,
+                 word_embed_size,
+                 char_embed_size,
+                 hidden_size,
+                 filter_num,
+                 filter_size,
+                 num_classes,
+                 max_seq_length,
+                 max_word_length,
+                 learning_rate,
+                 dropout,
                  elmo_bilm,
                  elmo_mode,
                  elmo_batcher):
@@ -55,7 +55,7 @@ class ElmoModel(object):
         self.chars = tf.placeholder(tf.string, [None, self.max_seq_length, self.max_word_length])
         self.dropout = tf.placeholder(tf.float32)
         self.labels = tf.placeholder(tf.int32, [None, self.max_seq_length])
-        self.length = tf.count_nonzero(self.tokens, axis=1)
+        self.length = tf.count_nonzero(self.labels, axis=1)
 
         # elmo
         self.elmo_p = tf.placeholder(tf.int32, [None, None, None])

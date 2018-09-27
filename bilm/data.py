@@ -2,6 +2,8 @@
 import glob
 import random
 
+from io import open
+
 import numpy as np
 
 # Wilson

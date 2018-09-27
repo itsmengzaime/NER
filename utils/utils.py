@@ -2,6 +2,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from io import open
+
 import numpy as np
 from gensim.models import KeyedVectors
 

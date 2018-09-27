@@ -4,7 +4,9 @@ import re
 import pickle
 import numpy as np
 
-from utils.utils import load_pretrained_glove, load_pretrained_senna
+from io import open
+
+from utils import load_pretrained_glove, load_pretrained_senna
 
 max_word_len = 30
 
@@ -44,7 +46,7 @@ def parse_conll2003():
                 token = data[0]
                 token = re.sub('\d', '0', token)
 
-                chars = [ch for ch in token]  # Character一定要保留大小写
+                chars = [chx for chx in token]  # Character一定要保留大小写
 
                 token = token.lower()  # 可选：是否全部转小写
 
@@ -82,8 +84,8 @@ def parse_conll2003():
         only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
         vocab = pretrained_vocab + only_in_train
 
-        vocab.insert(0, '<S>')
-        vocab.insert(1, '</S>')
+        vocab.insert(0, u'<S>')
+        vocab.insert(1, u'</S>')
 
         for word in vocab:
             fp.write(word + '\n')

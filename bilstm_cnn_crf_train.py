@@ -90,6 +90,10 @@ else:
     sess.run(tf.global_variables_initializer())
 sess.run(tf.tables_initializer())
 
+# feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 10)
+# tokens, chars, labels = feeder.feed()
+# a, b = sess.run([model.length, model.word_string_tensor], {model.tokens: tokens, model.chars: chars})
+
 train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 16)
 val_feeder = LSTMCNNCRFeeder(val_x, val_chars, val_la, max_seq_length, max_word_length, 16)
 test_feeder = LSTMCNNCRFeeder(test_x, test_chars, test_la, max_seq_length, max_word_length, 16)

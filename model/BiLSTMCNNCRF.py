@@ -16,17 +16,17 @@ class BiLSTMCNNCRFModel(object):
         learning_rate: learning rate
     """
 
-    def __init__(self, pre_embedding: bool,
-                 word_embed_size: int,
-                 char_embed_size: int,
-                 hidden_size: int,
-                 filter_num: int,
-                 filter_size: int,
-                 num_classes: int,
-                 max_seq_length: int,
-                 max_word_length: int,
-                 learning_rate: float,
-                 dropout: float):
+    def __init__(self, pre_embedding,
+                 word_embed_size,
+                 char_embed_size,
+                 hidden_size,
+                 filter_num,
+                 filter_size,
+                 num_classes,
+                 max_seq_length,
+                 max_word_length,
+                 learning_rate,
+                 dropout):
         self.pre_embedding = pre_embedding
         self.word_embed_size = word_embed_size
         self.char_embed_size = char_embed_size
@@ -46,7 +46,6 @@ class BiLSTMCNNCRFModel(object):
         self.chars = tf.placeholder(tf.string, [None, self.max_seq_length, self.max_word_length])
         self.dropout = tf.placeholder(tf.float32)
         self.labels = tf.placeholder(tf.int32, [None, self.max_seq_length])
-        self.length = tf.count_nonzero(self.tokens, axis=1)
 
     def _add_embedding(self):
         with tf.variable_scope('embedding'):
@@ -55,13 +54,20 @@ class BiLSTMCNNCRFModel(object):
                 pretrained_vocab, pretrained_embs = load_pretrained_senna()
 
                 only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
-                vocab = pretrained_vocab + only_in_train
+                vocab = [u'<PAD>'] + pretrained_vocab + only_in_train
 
                 vocab_lookup = tf.contrib.lookup.index_table_from_tensor(
                     mapping=tf.constant(vocab),
                     default_value=len(vocab)
                 )
                 word_string_tensor = vocab_lookup.lookup(self.tokens)
+
+                pad_embs = tf.get_variable(
+                    name='embs_pad',
+                    initializer=tf.zeros_initializer(),
+                    shape=[1, self.word_embed_size],
+                    trainable=False
+                )
 
                 pretrained_embs = tf.get_variable(
                     name='embs_pretrained',
@@ -81,7 +87,7 @@ class BiLSTMCNNCRFModel(object):
                     initializer=tf.contrib.layers.xavier_initializer(),
                     trainable=True
                 )
-                word_embeddings = tf.concat([pretrained_embs, train_embs, unk_embs], axis=0)
+                word_embeddings = tf.concat([pad_embs, pretrained_embs, train_embs, unk_embs], axis=0)
             else:
                 word_embeddings = tf.get_variable(
                     name='embeds_word',
@@ -91,6 +97,8 @@ class BiLSTMCNNCRFModel(object):
                     default_value=len(train_word_vocab)
                 )
                 word_string_tensor = vocab_lookup.lookup(self.tokens)
+
+            self.length = tf.count_nonzero(word_string_tensor, axis=1)
 
             self.word_embedding_layer = tf.nn.embedding_lookup(word_embeddings, word_string_tensor)
 
