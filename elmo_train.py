@@ -137,7 +137,7 @@ for epoch in range(start_epoch, max_epoch + 1):
     preds = []
     for step in range(test_feeder.step_per_epoch):
         tokens, chars, labels, ori_tokens = test_feeder.feed()
-        pred = model.test(sess, tokens, chars)
+        pred = model.test(sess, tokens, chars, ori_tokens)
         preds.extend(pred)
     true_seqs = [idx2la[la] for sl in test_la for la in sl]
     pred_seqs = [idx2la[la] for sl in preds for la in sl]
