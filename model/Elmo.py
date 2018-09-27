@@ -29,9 +29,10 @@ class ElmoModel(object):
                  max_word_length: int,
                  learning_rate: float,
                  dropout: float,
+
                  elmo_bilm,
-                 elmo_mode,
-                 elmo_batcher):
+                 elmo_batcher,
+                 elmo_mode):
         self.pre_embedding = pre_embedding
         self.word_embed_size = word_embed_size
         self.char_embed_size = char_embed_size
@@ -153,10 +154,6 @@ class ElmoModel(object):
         """
         embeddings_op = self.elmo_bilm(self.elmo_p)
         self.elmo_emb = weight_layers('input', embeddings_op, l2_coef=0.0)['weighted_op']
-
-        # self.elmo_emb = tc.layers.fully_connected(self.elmo_emb, num_outputs=self.hidden_size, activation_fn=None)
-
-        # self.elmo_emb = tf.nn.dropout(self.elmo_emb, self.dropout)
 
         if self.elmo_mode == 1:
             # concat word emb and elmo emb

@@ -4,7 +4,6 @@ import tensorflow as tf
 import h5py
 import json
 import re
-import logging
 
 from .data import UnicodeCharsVocabulary, Batcher
 
@@ -15,14 +14,11 @@ DTYPE_INT = 'int64'
 class BidirectionalLanguageModel(object):
     def __init__(
             self,
-#            options_file: str,
-#            weight_file: str,
-            options_file,
-            weight_file,
+            options_file: str,
+            weight_file: str,
             use_character_inputs=True,
             embedding_weight_file=None,
             max_batch_size=128,
-            trainable=False,
         ):
         '''
         Creates the language model computational graph and loads weights
@@ -59,7 +55,6 @@ class BidirectionalLanguageModel(object):
         self._embedding_weight_file = embedding_weight_file
         self._use_character_inputs = use_character_inputs
         self._max_batch_size = max_batch_size
-        self._trainable = trainable
 
         self._ops = {}
         self._graphs = {}
@@ -99,8 +94,7 @@ class BidirectionalLanguageModel(object):
                     ids_placeholder,
                     embedding_weight_file=self._embedding_weight_file,
                     use_character_inputs=self._use_character_inputs,
-                    max_batch_size=self._max_batch_size,
-                    trainable=self._trainable)
+                    max_batch_size=self._max_batch_size)
             else:
                 with tf.variable_scope('', reuse=True):
                     lm_graph = BidirectionalLanguageModelGraph(
@@ -109,8 +103,7 @@ class BidirectionalLanguageModel(object):
                         ids_placeholder,
                         embedding_weight_file=self._embedding_weight_file,
                         use_character_inputs=self._use_character_inputs,
-                        max_batch_size=self._max_batch_size,
-                        trainable=self._trainable)
+                        max_batch_size=self._max_batch_size)
 
             ops = self._build_ops(lm_graph)
             self._ops[ids_placeholder] = ops
@@ -123,25 +116,6 @@ class BidirectionalLanguageModel(object):
         with tf.control_dependencies([lm_graph.update_state_op]):
             # get the LM embeddings
             token_embeddings = lm_graph.embedding
-
-# Start Wilson
-            # remove BOS/EOS tokens in CNN embeddings
-            layer_wo_bos_eos0 = token_embeddings[:, 1:, :]
-            layer_wo_bos_eos0 = tf.reverse_sequence(
-                layer_wo_bos_eos0, 
-                lm_graph.sequence_lengths - 1,
-                seq_axis=1,
-                batch_axis=0,
-            )
-            layer_wo_bos_eos0 = layer_wo_bos_eos0[:, 1:, :]
-            layer_wo_bos_eos0 = tf.reverse_sequence(
-                layer_wo_bos_eos0,
-                lm_graph.sequence_lengths - 2,
-                seq_axis=1,
-                batch_axis=0,
-            )
-# END
-
             layers = [
                 tf.concat([token_embeddings, token_embeddings], axis=2)
             ]
@@ -205,9 +179,6 @@ class BidirectionalLanguageModel(object):
             'lm_embeddings': lm_embeddings, 
             'lengths': sequence_length_wo_bos_eos,
             'token_embeddings': lm_graph.embedding,
-# Start Wilson
-            'token_embeddings_wo_bos_eos': layer_wo_bos_eos0,
-# END
             'mask': mask_wo_bos_eos,
         }
 
@@ -245,8 +216,6 @@ def _pretrained_initializer(varname, weight_file, embedding_weight_file=None):
             weights[1:, :] = embed_weights
     else:
         with h5py.File(weight_file, 'r') as fin:
-            logger = logging.getLogger("brc")
-            logger.info('elmo varname in file = {}'.format(varname_in_file))
             if varname_in_file == 'char_embed':
                 # Have added a special 0 index for padding not present
                 # in the original model.
@@ -280,18 +249,17 @@ class BidirectionalLanguageModelGraph(object):
     '''
     def __init__(self, options, weight_file, ids_placeholder,
                  use_character_inputs=True, embedding_weight_file=None,
-                 max_batch_size=128, trainable=False):
+                 max_batch_size=128):
 
         self.options = options
         self._max_batch_size = max_batch_size
         self.ids_placeholder = ids_placeholder
         self.use_character_inputs = use_character_inputs
-        self.trainable = trainable
 
         # this custom_getter will make all variables not trainable and
         # override the default initializer
         def custom_getter(getter, name, *args, **kwargs):
-            kwargs['trainable'] = self.trainable
+            kwargs['trainable'] = False
             kwargs['initializer'] = _pretrained_initializer(
                 name, weight_file, embedding_weight_file
             )
@@ -319,10 +287,10 @@ class BidirectionalLanguageModelGraph(object):
         '''
         options contains key 'char_cnn': {
 
-        'n_characters': 60,
+        'n_characters': 262,
 
         # includes the start / end characters
-        'max_characters_per_token': 17,
+        'max_characters_per_token': 50,
 
         'filters': [
             [1, 32],
@@ -351,6 +319,10 @@ class BidirectionalLanguageModelGraph(object):
         max_chars = cnn_options['max_characters_per_token']
         char_embed_dim = cnn_options['embedding']['dim']
         n_chars = cnn_options['n_characters']
+        if n_chars != 262:
+            raise InvalidNumberOfCharacters(
+                "Set n_characters=262 after training see the README.md"
+            )
         if cnn_options['activation'] == 'tanh':
             activation = tf.nn.tanh
         elif cnn_options['activation'] == 'relu':

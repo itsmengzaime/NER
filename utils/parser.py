@@ -84,6 +84,7 @@ def parse_conll2003():
 
         vocab.insert(0, '<S>')
         vocab.insert(1, '</S>')
+        vocab.insert(2, '<UNK>')
 
         for word in vocab:
             fp.write(word + '\n')

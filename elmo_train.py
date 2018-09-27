@@ -65,8 +65,8 @@ model = ElmoModel(
     0.015,
     0.5,
     elmo_bilm,
-    1,    # elmo_mode
-    elmo_batcher)
+    elmo_batcher,
+    1)
 
 print('Start training...')
 print('Train size = %d' % len(train_x))
