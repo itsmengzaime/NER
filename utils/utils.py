@@ -73,8 +73,7 @@ def decay_learning_rate(learning_rate,
                 learning_rate, math_ops.add(tf.constant(1.0, dtype=tf.float32), math_ops.multiply(decay_rate, p))
             )
 
-        if not context.executing_eagerly():
-            decayed_lr = decayed_lr()
+        decayed_lr = decayed_lr()
 
         return decayed_lr
 

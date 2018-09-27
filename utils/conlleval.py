@@ -40,7 +40,7 @@ def split_tag(chunk_tag):
     """
     if chunk_tag == 'O':
         return ('O', None)
-    return chunk_tag.split('-', maxsplit=1)
+    return chunk_tag.split('-', 1)
 
 
 def is_chunk_end(prev_tag, tag):
