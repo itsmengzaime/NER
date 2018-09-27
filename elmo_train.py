@@ -57,7 +57,7 @@ model = ElmoModel(
     True,
     50,   # Word embedding size
     16,   # Character embedding size
-    100,  # LSTM state size
+    200,  # LSTM state size
     128,  # Filter num
     3,    # Filter size
     num_classes,
@@ -76,7 +76,7 @@ print('Test size = %d' % len(test_x))
 print('Num classes = %d' % num_classes)
 
 start_epoch = 1
-max_epoch = 1000
+max_epoch = 100
 
 saver = tf.train.Saver()
 best_saver = BestCheckpointSaver(

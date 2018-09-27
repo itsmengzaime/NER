@@ -156,7 +156,7 @@ class ElmoModel(object):
 
         # self.elmo_emb = tc.layers.fully_connected(self.elmo_emb, num_outputs=self.hidden_size, activation_fn=None)
 
-        self.elmo_emb = tf.nn.dropout(self.elmo_emb, self.dropout)
+        # self.elmo_emb = tf.nn.dropout(self.elmo_emb, self.dropout)
 
         if self.elmo_mode == 1:
             # concat word emb and elmo emb
@@ -179,8 +179,8 @@ class ElmoModel(object):
         rnn_inputs = tf.nn.dropout(self.embedding_layer, keep_prob=self.dropout)
 
         with tf.variable_scope('recurrent'):
-            fw_cells = [rnn_cell(200), rnn_cell(100)]
-            bw_cells = [rnn_cell(200), rnn_cell(100)]
+            fw_cells = [rnn_cell(200), rnn_cell(200)]
+            bw_cells = [rnn_cell(200), rnn_cell(200)]
             outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
                 fw_cells, bw_cells,
                 rnn_inputs,

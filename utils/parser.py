@@ -6,7 +6,7 @@ import numpy as np
 
 from utils.utils import load_pretrained_glove, load_pretrained_senna
 
-max_word_len = 20
+max_word_len = 30
 
 
 def parse_conll2003():
