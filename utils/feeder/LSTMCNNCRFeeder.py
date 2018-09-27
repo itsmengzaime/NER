@@ -59,8 +59,7 @@ class LSTMCNNCRFeeder(object):
         Change labels to (batch_size, max_length)
         '''
 
-        tokens = list(map(lambda x: np.pad(x, (0, self._max_seq_length - len(x)), 'constant', constant_values=0),
-                          tokens))  # Pad zeors
+        tokens = list(map(lambda x: x + ['<PAD>'] * (self._max_seq_length - len(x)), tokens))
         tokens = np.array(tokens, dtype=np.str)
 
         for i in range(len(chars)):
@@ -68,11 +67,10 @@ class LSTMCNNCRFeeder(object):
                 chars[i][j] = np.pad(chars[i][j], (0, self._max_char_length - len(chars[i][j])), 'constant',
                                      constant_values=0)
             for j in range(self._max_seq_length - len(chars[i])):
-                chars[i].append(np.zeros((self._max_char_length,), dtype=np.str))
-        chars = np.array(chars, dtype=np.str)
+                chars[i].append([0] * self._max_char_length)
+        chars = np.array(chars, dtype=np.int32)
 
-        labels = list(map(lambda x: np.pad(x, (0, self._max_seq_length - len(x)), 'constant', constant_values=0),
-                          labels))  # Pad zeors
+        labels = list(map(lambda x: x.tolist() + [0] * (self._max_seq_length - x.shape[0]), labels))
         labels = np.array(labels, dtype=np.int32)
 
         return tokens, chars, labels
@@ -87,6 +85,7 @@ class LSTMCNNCRFeeder(object):
         length = len(tokens)
 
         tokens = np.pad(tokens, (0, self._max_seq_length - tokens.shape[0]), 'constant', constant_values=0)
+        tokens = list(map(lambda x: x + ['<PAD>'] * (self._max_seq_length - len(x)), tokens))
         tokens = np.expand_dims(tokens, 0)
 
         for i in range(len(chars)):
@@ -106,8 +105,7 @@ class LSTMCNNCRFeeder(object):
         :return: (indices, values, shape), len
         """
 
-        tokens = list(map(lambda x: np.pad(x, (0, self._max_seq_length - x.shape[0]), 'constant', constant_values=0),
-                          tokens))  # Pad zeors
+        tokens = list(map(lambda x: x + ['<PAD>'] * (self._max_seq_length - len(x)), tokens))
         tokens = np.array(tokens, dtype=np.int32)
 
         for i in range(len(chars)):

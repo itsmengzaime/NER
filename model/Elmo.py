@@ -2,7 +2,6 @@
 
 import numpy as np
 import tensorflow as tf
-import tensorflow.contrib as tc
 
 from utils.utils import viterbi_decode_topk, decay_learning_rate, \
     load_train_vocab, load_pretrained_glove, load_pretrained_senna
@@ -53,10 +52,9 @@ class ElmoModel(object):
 
     def _add_placeholders(self):
         self.tokens = tf.placeholder(tf.string, [None, self.max_seq_length])
-        self.chars = tf.placeholder(tf.string, [None, self.max_seq_length, self.max_word_length])
+        self.chars = tf.placeholder(tf.int32, [None, self.max_seq_length, self.max_word_length])
         self.dropout = tf.placeholder(tf.float32)
         self.labels = tf.placeholder(tf.int32, [None, self.max_seq_length])
-        self.length = tf.count_nonzero(self.tokens, axis=1)
 
         # elmo
         self.elmo_p = tf.placeholder(tf.int32, [None, None, None])
@@ -69,7 +67,7 @@ class ElmoModel(object):
                 pretrained_vocab, pretrained_embs = load_pretrained_glove()
 
                 only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
-                vocab = pretrained_vocab + only_in_train
+                vocab = ['<PAD>'] + pretrained_vocab + only_in_train
 
                 vocab_lookup = tf.contrib.lookup.index_table_from_tensor(
                     mapping=tf.constant(vocab),
@@ -77,6 +75,12 @@ class ElmoModel(object):
                 )
                 word_string_tensor = vocab_lookup.lookup(self.tokens)
 
+                word_pad_embs = tf.get_variable(
+                    name='embs_word_pad',
+                    shape=[1, self.word_embed_size],
+                    initializer=tf.initializers.zeros,
+                    trainable=False
+                )
                 pretrained_embs = tf.get_variable(
                     name='embs_pretrained',
                     initializer=tf.constant_initializer(np.asarray(pretrained_embs), dtype=tf.float32),
@@ -95,7 +99,7 @@ class ElmoModel(object):
                     initializer=tf.contrib.layers.xavier_initializer(),
                     trainable=True
                 )
-                word_embeddings = tf.concat([pretrained_embs, train_embs, unk_embs], axis=0)
+                word_embeddings = tf.concat([word_pad_embs, pretrained_embs, train_embs, unk_embs], axis=0)
             else:
                 word_embeddings = tf.get_variable(
                     name='embeds_word',
@@ -106,21 +110,26 @@ class ElmoModel(object):
                 )
                 word_string_tensor = vocab_lookup.lookup(self.tokens)
 
+            self.length = tf.count_nonzero(word_string_tensor, axis=1)
+
             self.word_embedding_layer = tf.nn.embedding_lookup(word_embeddings, word_string_tensor)
 
-            char_embeddings = tf.get_variable(
+            char_pad_embs = tf.get_variable(
+                name='embs_char_pad',
+                shape=[1, self.char_embed_size],
+                initializer=tf.initializers.zeros,
+                trainable=False
+            )
+            char_embs = tf.get_variable(
                 name='embs_char',
                 shape=[len(train_char_vocab) + 1, self.char_embed_size],
                 initializer=tf.contrib.layers.xavier_initializer(),
                 trainable=True
             )
-            vocab_lookup = tf.contrib.lookup.index_table_from_tensor(
-                mapping=tf.constant(train_char_vocab),
-                default_value=len(train_char_vocab)
-            )
-            char_string_tensor = vocab_lookup.lookup(self.chars)
 
-            self.char_embedding_layer = tf.nn.embedding_lookup(char_embeddings, char_string_tensor)
+            char_embeddings = tf.concat([char_pad_embs, char_embs], axis=0)
+
+            self.char_embedding_layer = tf.nn.embedding_lookup(char_embeddings, self.chars)
 
     def _add_cnn(self):
         with tf.variable_scope('cnn'):

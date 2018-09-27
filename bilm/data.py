@@ -24,7 +24,7 @@ class Vocabulary(object):
         self._bos = -1
         self._eos = -1
 
-        with open(filename) as f:
+        with open(filename, encoding='gb18030') as f:
             idx = 0
             for line in f:
                 word_name = line.strip()
