@@ -26,7 +26,7 @@ def load_pretrained_senna():
 
 
 def load_pretrained_glove():
-    model = KeyedVectors.load_word2vec_format('resources/pretrained/glove/glove.6B.5d.txt')
+    model = KeyedVectors.load_word2vec_format('resources/pretrained/glove/glove.6B.50d.txt')
 
     vocab = list(model.vocab.keys())
     emb = model.vectors
