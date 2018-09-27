@@ -27,20 +27,25 @@ def parse_conll2003():
         x = []
         ch = []
         la = []
+        ox = []
 
         sx = []  # sentence x
         sc = []  # sentence char
         sl = []  # sentence label
+        sox = []  # sentence origin x
+
         for row in file:
             if row == '\n':
                 if sx:
                     x.append(sx)
                     ch.append(sc)
                     la.append(sl)
+                    ox.append(sox)
 
                     sx = []
                     sc = []
                     sl = []
+                    sox = []
             else:
                 data = row.split(' ')
                 token = data[0]
@@ -48,6 +53,7 @@ def parse_conll2003():
 
                 chars = [ch for ch in token]  # Character一定要保留大小写
 
+                ori_token = token  # 保留大小写
                 token = token.lower()  # 可选：是否全部转小写
 
                 label = data[-1].strip()
@@ -60,6 +66,7 @@ def parse_conll2003():
                 sx.append(token)
                 sc.append(chars)
                 sl.append(label)
+                sox.append(ori_token)
 
                 if prefix == 'train':
                     # Should only update word in train set
@@ -68,7 +75,7 @@ def parse_conll2003():
                     label_set.add(label)
 
                 vocab.add(token)
-        dump.append([x, ch, la])
+        dump.append([x, ch, la, ox])
 
     w2idx = {}
     ch2idx = {'<PAD>': 0}

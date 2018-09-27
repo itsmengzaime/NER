@@ -247,7 +247,7 @@ class ElmoModel(object):
         self._add_crf()
         self._add_train_op()
 
-    def train_step(self, sess, tokens, chars, labels):
+    def train_step(self, sess, tokens, chars, labels, ori_tokens):
         input_feed = {
             self.tokens: tokens,
             self.chars: chars,
@@ -256,8 +256,7 @@ class ElmoModel(object):
         }
 
         if self.elmo_bilm and self.elmo_batcher:
-            sub_tokens = [[token for token in sx if token != '<PAD>'] for sx in tokens]
-            token_ids = self.elmo_batcher.batch_sentences(sub_tokens)
+            token_ids = self.elmo_batcher.batch_sentences(ori_tokens)
             elmo_result = sess.run(self.elmo_emb, {self.elmo_p: token_ids})
 
             elmo_padded_emb = np.pad(elmo_result, ((0, 0), (0, tokens.shape[1] - elmo_result.shape[1]), (0, 0)), 'constant', constant_values=0)
@@ -276,7 +275,7 @@ class ElmoModel(object):
 
         return loss
 
-    def test(self, sess, tokens, chars):
+    def test(self, sess, tokens, chars, ori_tokens):
         input_feed = {
                 self.tokens: tokens,
                 self.chars: chars,
@@ -284,8 +283,7 @@ class ElmoModel(object):
             }
 
         if self.elmo_bilm and self.elmo_batcher:
-            sub_tokens = [[token for token in sx if token != '<PAD>'] for sx in tokens]
-            token_ids = self.elmo_batcher.batch_sentences(sub_tokens)
+            token_ids = self.elmo_batcher.batch_sentences(ori_tokens)
             elmo_result = sess.run(self.elmo_emb, {self.elmo_p: token_ids})
 
             elmo_padded_emb = np.pad(elmo_result, ((0, 0), (0, tokens.shape[1] - elmo_result.shape[1]), (0, 0)), 'constant', constant_values=0)

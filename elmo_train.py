@@ -31,9 +31,9 @@ w2idx, la2idx = dicts['words2idx'], dicts['labels2idx']
 idx2w = {w2idx[k]: k for k in w2idx}
 idx2la = {la2idx[k]: k for k in la2idx}
 
-train_x, train_chars, train_la = train_set
-val_x, val_chars, val_la = val_set
-test_x, test_chars, test_la = test_set
+train_x, train_chars, train_la, train_ori_x = train_set
+val_x, val_chars, val_la, val_ori_x = val_set
+test_x, test_chars, test_la, test_ori_x = test_set
 
 print('Load elmo...')
 elmo_batcher = Batcher('dev/vocab.txt', 50)
@@ -54,11 +54,11 @@ max_word_length = max(
 
 model = ElmoModel(
     True,
-    50,   # Word embedding size
-    16,   # Character embedding size
+    50,  # Word embedding size
+    16,  # Character embedding size
     200,  # LSTM state size
     128,  # Filter num
-    3,    # Filter size
+    3,  # Filter size
     num_classes,
     max_seq_length,
     max_word_length,
@@ -101,19 +101,19 @@ else:
 sess.run(tf.tables_initializer())
 
 # feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 10)
-# tokens, chars, labels = feeder.feed()
+# tokens, chars, labels, ori_tokens = feeder.feed()
 # length = sess.run(model.length, {model.tokens: tokens, model.chars: chars})
 
-train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, max_word_length, 16)
-val_feeder = LSTMCNNCRFeeder(val_x, val_chars, val_la, max_seq_length, max_word_length, 16)
-test_feeder = LSTMCNNCRFeeder(test_x, test_chars, test_la, max_seq_length, max_word_length, 16)
+train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, train_ori_x, max_seq_length, max_word_length, 16)
+val_feeder = LSTMCNNCRFeeder(val_x, val_chars, val_la, val_ori_x, max_seq_length, max_word_length, 16)
+test_feeder = LSTMCNNCRFeeder(test_x, test_chars, test_la, test_ori_x, max_seq_length, max_word_length, 16)
 
 for epoch in range(start_epoch, max_epoch + 1):
     loss = 0
     for step in range(train_feeder.step_per_epoch):
-        tokens, chars, labels = train_feeder.feed()
+        tokens, chars, labels, ori_tokens = train_feeder.feed()
 
-        step_loss = model.train_step(sess, tokens, chars, labels)
+        step_loss = model.train_step(sess, tokens, chars, labels, ori_tokens)
         loss += step_loss
 
         logging.info('epoch: %d, size: %d/%d, step_loss: %f, epoch_loss: %f' %
@@ -122,11 +122,11 @@ for epoch in range(start_epoch, max_epoch + 1):
 
     preds = []
     for step in range(val_feeder.step_per_epoch):
-        tokens, chars, labels = val_feeder.feed()
-        pred = model.test(sess, tokens, chars)
+        tokens, chars, labels, ori_tokens = val_feeder.feed()
+        pred = model.test(sess, tokens, chars, ori_tokens)
         preds.extend(pred)
-    true_seqs = [idx2la[la] for sl in val_la for la in sl ]
-    pred_seqs = [idx2la[la] for sl in preds for la in sl ]
+    true_seqs = [idx2la[la] for sl in val_la for la in sl]
+    pred_seqs = [idx2la[la] for sl in preds for la in sl]
     ll = min(len(true_seqs), len(pred_seqs))
     _, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
 
@@ -136,7 +136,7 @@ for epoch in range(start_epoch, max_epoch + 1):
 
     preds = []
     for step in range(test_feeder.step_per_epoch):
-        tokens, chars, labels = test_feeder.feed()
+        tokens, chars, labels, ori_tokens = test_feeder.feed()
         pred = model.test(sess, tokens, chars)
         preds.extend(pred)
     true_seqs = [idx2la[la] for sl in test_la for la in sl]

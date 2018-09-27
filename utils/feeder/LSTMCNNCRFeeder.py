@@ -16,6 +16,7 @@ class LSTMCNNCRFeeder(object):
     def __init__(self, tokens,
                  chars,
                  labels,
+                 ori_tokens,
                  max_seq_length: int,
                  max_char_length: int,
                  batch_size: int):
@@ -23,6 +24,7 @@ class LSTMCNNCRFeeder(object):
         self._tokens = tokens
         self._chars = chars
         self._labels = labels
+        self._ori_tokens = ori_tokens
         self._max_seq_length = max_seq_length
         self._max_char_length = max_char_length
         self._batch_size = batch_size
@@ -50,6 +52,7 @@ class LSTMCNNCRFeeder(object):
         tokens = self._tokens[self.offset: next_offset]
         chars = self._chars[self.offset: next_offset]
         labels = self._labels[self.offset: next_offset]
+        ori_tokens = self._ori_tokens[self.offset: next_offset]
         self.offset = next_offset
 
         '''
@@ -73,7 +76,7 @@ class LSTMCNNCRFeeder(object):
         labels = list(map(lambda x: x.tolist() + [0] * (self._max_seq_length - x.shape[0]), labels))
         labels = np.array(labels, dtype=np.int32)
 
-        return tokens, chars, labels
+        return tokens, chars, labels, ori_tokens
 
     def predict(self, tokens, chars):
         """
