@@ -290,19 +290,36 @@ class ElmoModel(object):
 
         return pred
 
-    def decode(self, sess, tokens, chars, length, topK=5):
+    def decode(self, sess, tokens, chars, topK=5):
         """
         score: [seq_len, num_tags]
         transition_params: [num_tags, num_tags]
         """
 
-        score, trans_params = sess.run([self.unary_potentials, self.trans_params], {
-            self.tokens: tokens,
+        lower_tokens = np.char.lower(tokens)
+
+        input_feed = {
+            self.tokens: lower_tokens,
             self.chars: chars,
             self.dropout: 1.0
-        })
-        score = np.squeeze(score, 0)
-        score = score[:length, :]
+        }
+
+        if self.elmo_bilm and self.elmo_batcher:
+            input_feed[self.elmo_p] = self.elmo_batcher.batch_sentences([sx.tolist() for sx in tokens])
+
+        scores, trans_params, lengths = sess.run([self.unary_potentials, self.trans_params, self.length], input_feed)
+
+        out = []
+        for score, length in zip(scores, lengths):
+            score = score[:length, :]
+
+            viterbi, viterbi_score = viterbi_decode_topk(
+                score,
+                trans_params,
+                topK
+            )
+
+            out.append(viterbi)
 
         '''
         viterbi, viterbi_score = tf.contrib.crf.viterbi_decode(
@@ -312,13 +329,17 @@ class ElmoModel(object):
         print("{:<20} {}".format(viterbi_score, viterbi))
         '''
 
+        '''
         viterbi, viterbi_score = viterbi_decode_topk(
             score,
             trans_params,
             topK
         )
+        '''
 
-        for a, b in zip(viterbi_score, viterbi):
-            print("{:<20} {}".format(a, b))
+        # for a, b in zip(viterbi_score, viterbi):
+        #     print("{:<20} {}".format(a, b))
 
-        return viterbi, viterbi_score
+        # return viterbi, viterbi_score
+
+        return out

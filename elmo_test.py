@@ -4,12 +4,13 @@ import os
 import pickle
 from tqdm import tqdm
 
+import numpy as np
 import tensorflow as tf
 
 from utils.feeder.LSTMCNNCRFeeder import LSTMCNNCRFeeder
 from utils.parser import parse_conll2003
 from utils.conlleval import evaluate
-from utils.checkmate import BestCheckpointSaver, best_checkpoint
+from utils.checkmate import best_checkpoint
 
 from model.Elmo import ElmoModel
 
@@ -54,18 +55,18 @@ max_word_length = max(
 
 model = ElmoModel(
     True,
-    50,   # Word embedding size
-    16,   # Character embedding size
+    50,  # Word embedding size
+    16,  # Character embedding size
     200,  # LSTM state size
     128,  # Filter num
-    3,    # Filter size
+    3,  # Filter size
     num_classes,
     max_seq_length,
     max_word_length,
     0.015,
     0.5,
     elmo_bilm,
-    1,    # elmo_mode
+    1,  # elmo_mode
     elmo_batcher)
 
 print('Start training...')
@@ -78,11 +79,6 @@ start_epoch = 1
 max_epoch = 100
 
 saver = tf.train.Saver()
-best_saver = BestCheckpointSaver(
-    save_dir='checkpoints/best',
-    num_to_keep=1,
-    maximize=True
-)
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -101,14 +97,14 @@ for step in tqdm(range(val_feeder.step_per_epoch)):
     tokens, chars, labels = val_feeder.feed()
     pred = model.test(sess, tokens, chars)
     preds.extend(pred)
-true_seqs = [idx2la[la] for sl in val_la for la in sl ]
-pred_seqs = [idx2la[la] for sl in preds for la in sl ]
+true_seqs = [idx2la[la] for sl in val_la for la in sl]
+pred_seqs = [idx2la[la] for sl in preds for la in sl]
 ll = min(len(true_seqs), len(pred_seqs))
 _, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
 
 val_feeder.next_epoch(False)
 
-print("val_f1: %f" % f1)
+print("\nval_f1: %f" % f1)
 
 preds = []
 for step in tqdm(range(test_feeder.step_per_epoch)):
@@ -122,16 +118,16 @@ _, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
 
 test_feeder.next_epoch(False)
 
+print("\ntest_f1: %f" % f1)
 
-'''
+
 def dump_topK(prefix, feeder, topK):
     with open('dev/predict.%s' % prefix, 'w') as fp:
         for _ in tqdm(range(feeder.step_per_epoch)):
             tokens, chars, labels = feeder.feed()
 
-            for i in range(min(16, tokens.shape[0])):
-                preds, scores = model.decode(sess, np.expand_dims(tokens[i], 0), np.expand_dims(chars[i], 0), topK)
-
+            out = model.decode(sess, tokens, chars, topK)
+            for i, preds in enumerate(out):
                 length = len(preds[0])
 
                 st = tokens[i, :length].tolist()
@@ -144,7 +140,7 @@ def dump_topK(prefix, feeder, topK):
                 fp.write('\n')
 
 
-dump_topK('train', train_feeder, 3)
-dump_topK('dev', val_feeder, 3)
-dump_topK('test', test_feeder, 3)
-'''
+dump_topK('train', train_feeder, 10)
+dump_topK('dev', val_feeder, 10)
+dump_topK('test', test_feeder, 10)
+
