@@ -266,8 +266,11 @@ class ElmoModel(object):
         return loss
 
     def test(self, sess, tokens, chars):
+
+        lower_tokens = np.char.lower(tokens)
+
         input_feed = {
-                self.tokens: tokens,
+                self.tokens: lower_tokens,
                 self.chars: chars,
                 self.dropout: 1.0
             }
