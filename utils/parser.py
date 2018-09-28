@@ -18,6 +18,8 @@ def parse_conll2003():
     char_set = set()
     label_set = set()
 
+    vocab = set()
+
     files = [('train', train_file), ('val', val_file), ('test', test_file)]
     dump = []
 
@@ -46,7 +48,7 @@ def parse_conll2003():
 
                 chars = [ch for ch in token]  # Character一定要保留大小写
 
-                token = token.lower()  # 可选：是否全部转小写
+                # token = token.lower()  # 可选：是否全部转小写
 
                 label = data[-1].strip()
 
@@ -61,9 +63,10 @@ def parse_conll2003():
 
                 if prefix == 'train':
                     # Should only update word in train set
-                    word_set.add(token)
+                    word_set.add(token.lower())  # word embedding词汇表只要小写
                     char_set.update(*chars)
                     label_set.add(label)
+                vocab.add(token)  # elmo embedding词汇表大小写都要
         dump.append([x, ch, la])
 
     w2idx = {}
@@ -76,11 +79,7 @@ def parse_conll2003():
             fp.write(word + '\n')
 
     with open('dev/vocab.txt', 'w', encoding='gb18030') as fp:
-        train_word_vocab = sorted(word_set)
-        pretrained_vocab, _ = load_pretrained_glove()
-
-        only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
-        vocab = pretrained_vocab + only_in_train
+        vocab = sorted(vocab)
 
         vocab.insert(0, '<S>')
         vocab.insert(1, '</S>')

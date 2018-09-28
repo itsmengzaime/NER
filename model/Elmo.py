@@ -240,8 +240,11 @@ class ElmoModel(object):
         self._add_train_op()
 
     def train_step(self, sess, tokens, chars, labels):
+
+        lower_tokens = np.char.lower(tokens)
+
         input_feed = {
-            self.tokens: tokens,
+            self.tokens: lower_tokens,
             self.chars: chars,
             self.labels: labels,
             self.dropout: self._dropout
