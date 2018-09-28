@@ -74,7 +74,7 @@ def parse_conll2003():
                     char_set.update(*chars)
                     label_set.add(label)
 
-                vocab.add(token)
+                vocab.add(ori_token)
         dump.append([x, ch, la, ox])
 
     w2idx = {}
