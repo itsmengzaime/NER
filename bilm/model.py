@@ -14,8 +14,8 @@ DTYPE_INT = 'int64'
 class BidirectionalLanguageModel(object):
     def __init__(
             self,
-            options_file: str,
-            weight_file: str,
+            options_file,
+            weight_file,
             use_character_inputs=True,
             embedding_weight_file=None,
             max_batch_size=128,

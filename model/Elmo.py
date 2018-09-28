@@ -17,17 +17,17 @@ class ElmoModel(object):
         learning_rate: learning rate
     """
 
-    def __init__(self, pre_embedding: bool,
-                 word_embed_size: int,
-                 char_embed_size: int,
-                 hidden_size: int,
-                 filter_num: int,
-                 filter_size: int,
-                 num_classes: int,
-                 max_seq_length: int,
-                 max_word_length: int,
-                 learning_rate: float,
-                 dropout: float,
+    def __init__(self, pre_embedding,
+                 word_embed_size,
+                 char_embed_size,
+                 hidden_size,
+                 filter_num,
+                 filter_size,
+                 num_classes,
+                 max_seq_length,
+                 max_word_length,
+                 learning_rate,
+                 dropout,
 
                  elmo_bilm,
                  elmo_batcher,
@@ -64,11 +64,11 @@ class ElmoModel(object):
         with tf.variable_scope('embedding'):
             train_word_vocab, train_char_vocab = load_train_vocab()
             if self.pre_embedding:
-                # pretrained_vocab, pretrained_embs = load_pretrained_senna()
-                pretrained_vocab, pretrained_embs = load_pretrained_glove()
+                pretrained_vocab, pretrained_embs = load_pretrained_senna()
+                # pretrained_vocab, pretrained_embs = load_pretrained_glove()
 
                 only_in_train = list(set(train_word_vocab) - set(pretrained_vocab))
-                vocab = ['<PAD>'] + pretrained_vocab + only_in_train
+                vocab = [u'<PAD>'] + pretrained_vocab + only_in_train
 
                 vocab_lookup = tf.contrib.lookup.index_table_from_tensor(
                     mapping=tf.constant(vocab),

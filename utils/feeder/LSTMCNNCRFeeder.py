@@ -17,9 +17,9 @@ class LSTMCNNCRFeeder(object):
                  chars,
                  labels,
                  ori_tokens,
-                 max_seq_length: int,
-                 max_char_length: int,
-                 batch_size: int):
+                 max_seq_length,
+                 max_char_length,
+                 batch_size):
 
         self._tokens = tokens
         self._chars = chars
@@ -62,7 +62,7 @@ class LSTMCNNCRFeeder(object):
         Change labels to (batch_size, max_length)
         '''
 
-        tokens = list(map(lambda x: x + ['<PAD>'] * (self._max_seq_length - len(x)), tokens))
+        tokens = list(map(lambda x: x + [u'<PAD>'] * (self._max_seq_length - len(x)), tokens))
         tokens = np.array(tokens, dtype=np.str)
 
         for i in range(len(chars)):
@@ -88,7 +88,7 @@ class LSTMCNNCRFeeder(object):
         length = len(tokens)
 
         tokens = np.pad(tokens, (0, self._max_seq_length - tokens.shape[0]), 'constant', constant_values=0)
-        tokens = list(map(lambda x: x + ['<PAD>'] * (self._max_seq_length - len(x)), tokens))
+        tokens = list(map(lambda x: x + [u'<PAD>'] * (self._max_seq_length - len(x)), tokens))
         tokens = np.expand_dims(tokens, 0)
 
         for i in range(len(chars)):
@@ -108,7 +108,7 @@ class LSTMCNNCRFeeder(object):
         :return: (indices, values, shape), len
         """
 
-        tokens = list(map(lambda x: x + ['<PAD>'] * (self._max_seq_length - len(x)), tokens))
+        tokens = list(map(lambda x: x + [u'<PAD>'] * (self._max_seq_length - len(x)), tokens))
         tokens = np.array(tokens, dtype=np.int32)
 
         for i in range(len(chars)):

@@ -2,9 +2,9 @@
 import glob
 import random
 
-import numpy as np
+from io import open
 
-from typing import List
+import numpy as np
 
 
 class Vocabulary(object):
@@ -163,7 +163,7 @@ class UnicodeCharsVocabulary(Vocabulary):
         word_encoded = word.encode('utf-8', 'ignore')[:(self.max_word_length-2)]
         code[0] = self.bow_char
         for k, chr_id in enumerate(word_encoded, start=1):
-            code[k] = chr_id
+            code[k] = ord(chr_id)
         code[k + 1] = self.eow_char
 
         return code
@@ -194,7 +194,7 @@ class Batcher(object):
     ''' 
     Batch sentences of tokenized text into character id matrices.
     '''
-    def __init__(self, lm_vocab_file: str, max_token_length: int):
+    def __init__(self, lm_vocab_file, max_token_length):
         '''
         lm_vocab_file = the language model vocabulary file (one line per
             token)
@@ -205,7 +205,7 @@ class Batcher(object):
         )
         self._max_token_length = max_token_length
 
-    def batch_sentences(self, sentences: List[List[str]]):
+    def batch_sentences(self, sentences):
         '''
         Batch the sentences as character ids
         Each sentence is a list of tokens without <s> or </s>, e.g.
@@ -233,14 +233,14 @@ class TokenBatcher(object):
     ''' 
     Batch sentences of tokenized text into token id matrices.
     '''
-    def __init__(self, lm_vocab_file: str):
+    def __init__(self, lm_vocab_file):
         '''
         lm_vocab_file = the language model vocabulary file (one line per
             token)
         '''
         self._lm_vocab = Vocabulary(lm_vocab_file)
 
-    def batch_sentences(self, sentences: List[List[str]]):
+    def batch_sentences(self, sentences):
         '''
         Batch the sentences as character ids
         Each sentence is a list of tokens without <s> or </s>, e.g.
