@@ -92,6 +92,7 @@ train_feeder = LSTMCNNCRFeeder(train_x, train_chars, train_la, max_seq_length, m
 val_feeder = LSTMCNNCRFeeder(val_x, val_chars, val_la, max_seq_length, max_word_length, 16)
 test_feeder = LSTMCNNCRFeeder(test_x, test_chars, test_la, max_seq_length, max_word_length, 16)
 
+'''
 preds = []
 for step in tqdm(range(val_feeder.step_per_epoch)):
     tokens, chars, labels = val_feeder.feed()
@@ -119,15 +120,19 @@ _, _, f1 = evaluate(true_seqs[:ll], pred_seqs[:ll], False)
 test_feeder.next_epoch(False)
 
 print("\ntest_f1: %f" % f1)
+'''
 
 
 def dump_topK(prefix, feeder, topK):
+    """
+    TOKEN LABEL TOP1 TOP2 ... TOPN B_PER I_PER
+    """
     with open('dev/predict.%s' % prefix, 'w') as fp:
         for _ in tqdm(range(feeder.step_per_epoch)):
             tokens, chars, labels = feeder.feed()
 
-            out = model.decode(sess, tokens, chars, topK)
-            for i, preds in enumerate(out):
+            out_seqs, out_scores = model.decode(sess, tokens, chars, topK)
+            for i, (preds, scores) in enumerate(zip(out_seqs, out_scores)):
                 length = len(preds[0])
 
                 st = tokens[i, :length].tolist()
@@ -136,11 +141,19 @@ def dump_topK(prefix, feeder, topK):
                 preds = [[idx2la[la] for la in pred] for pred in preds]
 
                 for all in zip(*[st, sl, *preds]):
-                    fp.write(' '.join(all) + '\n')
+                    fp.write('\t'.join(all) + '\n')
+
+                # Save path scores
+                score_all = sum(scores)
+                norm_scores = [''] * 2 + \
+                              ['{:.4f}'.format(score / score_all) for score in scores] + \
+                              [''] * topK
+                fp.write('\t'.join(scores) + '\n')
+                fp.write('\t'.join(norm_scores) + '\n')
+
                 fp.write('\n')
 
 
-dump_topK('train', train_feeder, 10)
-dump_topK('dev', val_feeder, 10)
+# dump_topK('train', train_feeder, 10)
+# dump_topK('dev', val_feeder, 10)
 dump_topK('test', test_feeder, 10)
-

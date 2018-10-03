@@ -179,8 +179,8 @@ class ElmoModel(object):
         rnn_inputs = tf.nn.dropout(self.embedding_layer, keep_prob=self.dropout)
 
         with tf.variable_scope('recurrent'):
-            fw_cells = [rnn_cell(200), rnn_cell(200)]
-            bw_cells = [rnn_cell(200), rnn_cell(200)]
+            fw_cells = [rnn_cell(200, False), rnn_cell(200, False)]
+            bw_cells = [rnn_cell(200, False), rnn_cell(200, False)]
             outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
                 fw_cells, bw_cells,
                 rnn_inputs,
@@ -291,11 +291,6 @@ class ElmoModel(object):
         return pred
 
     def decode(self, sess, tokens, chars, topK=5):
-        """
-        score: [seq_len, num_tags]
-        transition_params: [num_tags, num_tags]
-        """
-
         lower_tokens = np.char.lower(tokens)
 
         input_feed = {
@@ -309,7 +304,7 @@ class ElmoModel(object):
 
         scores, trans_params, lengths = sess.run([self.unary_potentials, self.trans_params, self.length], input_feed)
 
-        out = []
+        out_seqs, out_scores = [], []
         for score, length in zip(scores, lengths):
             score = score[:length, :]
 
@@ -319,7 +314,8 @@ class ElmoModel(object):
                 topK
             )
 
-            out.append(viterbi)
+            out_seqs.append(viterbi)
+            out_scores.append(viterbi_score)
 
         '''
         viterbi, viterbi_score = tf.contrib.crf.viterbi_decode(
@@ -342,4 +338,4 @@ class ElmoModel(object):
 
         # return viterbi, viterbi_score
 
-        return out
+        return out_seqs, out_scores
